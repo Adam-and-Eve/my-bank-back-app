@@ -9,6 +9,7 @@ contracts {
 }
 
 dependencies {
+    implementation(project(":shared"))
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.actuator)
