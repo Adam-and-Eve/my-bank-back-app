@@ -18,6 +18,11 @@ x-resource-server-env: &resource-server-env
   BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
   BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
 
+x-gateway-env: &gateway-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+
 
 services:
   postgres:
@@ -91,6 +96,27 @@ services:
     healthcheck:
       <<: *platform-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8761'" ]
+    networks: [ bank-network ]
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    image: my-api-gateway:local
+    container_name: api-gateway
+    profiles:
+      - infra
+    environment:
+      <<: *gateway-env
+    ports:
+      - "8080:8080"
+    depends_on:
+      config-server:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8080'" ]
     networks: [ bank-network ]
 
 volumes:
