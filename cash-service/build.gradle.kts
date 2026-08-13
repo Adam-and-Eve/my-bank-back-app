@@ -20,8 +20,7 @@ dependencies {
     implementation(libs.spring.cloud.starter.loadbalancer)
     implementation(libs.spring.cloud.starter.netflix.eureka.client)
 
-    "contractTestImplementation"(libs.spring.boot.starter.test)
-    "contractTestImplementation"(libs.spring.cloud.starter.contract.verifier)
-    "contractTestImplementation"(libs.spring.security.test)
+    testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.cloud.starter.contract.verifier)
     testImplementation(libs.spring.security.test)
 }
