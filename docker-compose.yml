@@ -28,6 +28,12 @@ x-notification-service-env: &notification-service-env
   BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
   BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
 
+x-transfer-service-env: &transfer-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  TRANSFER_SERVICE_CLIENT_SECRET: ${TRANSFER_SERVICE_CLIENT_SECRET:-__TRANSFER_SERVICE_CLIENT_SECRET__}
+  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
 
 services:
   postgres:
@@ -129,6 +135,23 @@ services:
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8084'" ]
     networks: [ bank-network ]
 
+  transfer-service:
+    build:
+      context: ./transfer-service
+    image: my-bank-transfer-service:local
+    container_name: transfer-service
+    profiles:
+      - full
+    environment:
+      <<: *transfer-service-env
+    depends_on:
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8083'" ]
+    networks: [ bank-network ]
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -141,7 +164,7 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      notification-service:
+      transfer-service:
         condition: service_healthy
     healthcheck:
       <<: *app-health
