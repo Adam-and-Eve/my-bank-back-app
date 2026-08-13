@@ -57,7 +57,7 @@ services:
       <<: *app-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8080'" ]
     volumes:
-      - ./keycloak/realms/bank-realm.json:/opt/keycloak/data/import/bank-realm-realm.json:ro
+      - ./keycloak/realms:/opt/keycloak/data/import:ro
     networks: [ bank-network ]
 
   config-server:
