@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.cash.client;
+package ru.yandex.practicum.bank.cash.clients;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

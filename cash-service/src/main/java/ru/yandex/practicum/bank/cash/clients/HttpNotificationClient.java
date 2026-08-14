@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.cash.client;
+package ru.yandex.practicum.bank.cash.clients;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;

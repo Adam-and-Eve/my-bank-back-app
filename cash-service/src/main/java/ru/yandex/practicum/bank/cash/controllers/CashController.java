@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.bank.cash.exceptions.MissingPreferredUsernameException;
 import ru.yandex.practicum.bank.cash.interfaces.CashService;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
@@ -16,6 +17,7 @@ import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
  * с автоматическим извлечением логина пользователя из JWT-токена авторизации.
  * </summary>
  **/
+@RestController
 public class CashController {
 
     // region Fields
