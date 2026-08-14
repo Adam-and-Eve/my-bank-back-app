@@ -42,6 +42,23 @@ x-cash-service-env: &cash-service-env
   CASH_SERVICE_CLIENT_SECRET: ${CASH_SERVICE_CLIENT_SECRET:-__CASH_SERVICE_CLIENT_SECRET__}
   BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
 
+x-account-service-env: &account-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bank
+  BANK_DATASOURCE_USERNAME: postgres
+
+x-front-ui-service-env: &front-ui-service-env
+  <<: *config-client-env
+  FRONT_UI_SERVICE_CLIENT_SECRET: ${FRONT_UI_SERVICE_CLIENT_SECRET:-__FRONT_UI_SERVICE_CLIENT_SECRET__}
+  BANK_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/auth
+  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_KEYCLOAK_USER_INFO_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/userinfo
+  BANK_KEYCLOAK_END_SESSION_URI: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout
+  API_GATEWAY_URL: http://api-gateway:8080
+
 services:
   postgres:
     image: postgres:18
@@ -176,6 +193,25 @@ services:
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8083'" ]
     networks: [ bank-network ]
 
+  account-service:
+    build:
+      context: ./account-service
+    image: my-bank-account-service:local
+    container_name: account-service
+    profiles:
+      - full
+    environment:
+      <<: *account-service-env
+    depends_on:
+      cash-service:
+        condition: service_healthy
+      transfer-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8081'" ]
+    networks: [ bank-network ]
+
   api-gateway:
     build:
       context: ./api-gateway
@@ -188,11 +224,30 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      transfer-service:
+      account-service:
         condition: service_healthy
     healthcheck:
       <<: *app-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8080'" ]
+    networks: [ bank-network ]
+
+  front-ui-service:
+    build:
+      context: ./front-ui-service
+    image: my-bank-front-ui-service:local
+    container_name: front-ui-service
+    profiles:
+      - full
+    environment:
+      <<: *front-ui-service-env
+    ports:
+      - "8085:8085"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8085'" ]
     networks: [ bank-network ]
 
 volumes:
