@@ -35,6 +35,13 @@ x-transfer-service-env: &transfer-service-env
   TRANSFER_SERVICE_CLIENT_SECRET: ${TRANSFER_SERVICE_CLIENT_SECRET:-__TRANSFER_SERVICE_CLIENT_SECRET__}
   BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
 
+x-cash-service-env: &cash-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  CASH_SERVICE_CLIENT_SECRET: ${CASH_SERVICE_CLIENT_SECRET:-__CASH_SERVICE_CLIENT_SECRET__}
+  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+
 services:
   postgres:
     image: postgres:18
@@ -133,6 +140,23 @@ services:
     healthcheck:
       <<: *app-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8084'" ]
+    networks: [ bank-network ]
+
+  cash-service:
+    build:
+      context: ./cash-service
+    image: my-bank-cash-service:local
+    container_name: cash-service
+    profiles:
+      - full
+    environment:
+      <<: *cash-service-env
+    depends_on:
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8082'" ]
     networks: [ bank-network ]
 
   transfer-service:
