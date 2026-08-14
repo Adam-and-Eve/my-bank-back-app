@@ -24,10 +24,8 @@ dependencies {
     runtimeOnly(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
 
-    "contractTestImplementation"(libs.spring.boot.starter.test)
-    "contractTestImplementation"(libs.spring.cloud.starter.contract.verifier)
-    "contractTestImplementation"(libs.spring.security.test)
-
+    testImplementation(libs.spring.boot.starter.test)
+    testImplementation(libs.spring.cloud.starter.contract.verifier)
     testImplementation(libs.spring.security.test)
     testRuntimeOnly(libs.h2)
 }
