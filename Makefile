@@ -1,9 +1,12 @@
-.PHONY: clean-build up full
+.PHONY: clean-build up app deploy
 
 clean-build:
 	./gradlew clean bootJar
 
 up:
-	docker compose --profile full up --build -d
+	docker compose --profile app up --build -d
 
-full: clean-build up
+app: clean-build up
+
+deploy: clean-build
+	docker compose --profile deploy up --build -d

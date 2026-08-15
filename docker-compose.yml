@@ -65,7 +65,8 @@ services:
     container_name: postgres
     profiles:
       - infra
-      - full
+      - app
+      - deploy
     environment:
       POSTGRES_DB: bank
       POSTGRES_HOST_AUTH_METHOD: trust
@@ -85,7 +86,8 @@ services:
     container_name: keycloak
     profiles:
       - infra
-      - full
+      - app
+      - deploy
     command: [ "start-dev", "--import-realm" ]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-__KEYCLOAK_ADMIN_USERNAME__}
@@ -109,7 +111,8 @@ services:
     container_name: config-server
     profiles:
       - infra
-      - full
+      - app
+      - deploy
     ports:
       - "8888:8888"
     depends_on:
@@ -129,7 +132,8 @@ services:
     container_name: discovery-server
     profiles:
       - infra
-      - full
+      - app
+      - deploy
     environment:
       <<: *config-client-env
     ports:
@@ -148,7 +152,8 @@ services:
     image: my-bank-notification-service:local
     container_name: notification-service
     profiles:
-      - full
+      - app
+      - deploy
     environment:
       <<: *notification-service-env
     depends_on:
@@ -165,7 +170,8 @@ services:
     image: my-bank-cash-service:local
     container_name: cash-service
     profiles:
-      - full
+      - app
+      - deploy
     environment:
       <<: *cash-service-env
     depends_on:
@@ -182,7 +188,8 @@ services:
     image: my-bank-transfer-service:local
     container_name: transfer-service
     profiles:
-      - full
+      - app
+      - deploy
     environment:
       <<: *transfer-service-env
     depends_on:
@@ -199,7 +206,8 @@ services:
     image: my-bank-account-service:local
     container_name: account-service
     profiles:
-      - full
+      - app
+      - deploy
     environment:
       <<: *account-service-env
     depends_on:
@@ -218,7 +226,8 @@ services:
     image: my-bank-api-gateway:local
     container_name: api-gateway
     profiles:
-      - full
+      - app
+      - deploy
     environment:
       <<: *api-gateway-env
     ports:
@@ -237,7 +246,8 @@ services:
     image: my-bank-front-ui-service:local
     container_name: front-ui-service
     profiles:
-      - full
+      - app
+      - deploy
     environment:
       <<: *front-ui-service-env
     ports:
@@ -248,6 +258,22 @@ services:
     healthcheck:
       <<: *app-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8085'" ]
+    networks: [ bank-network ]
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    profiles:
+      - deploy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      front-ui-service:
+        condition: service_healthy
     networks: [ bank-network ]
 
 volumes:

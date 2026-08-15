@@ -88,25 +88,25 @@ NOTIFICATION_SERVICE_CLIENT_SECRET=<секрет_из_realm>
 ### 2. Запуск полной инфраструктуры + всех сервисов
 
 ```bash
-docker compose --profile full up --build -d
+docker compose --profile app up --build -d
 ```
 
 ### 3. Проверка статуса
 
 ```bash
-docker compose --profile full up --build -d
+docker compose --profile app up --build -d
 ```
 
 ### 4. Просмотр логов
 
 ```bash
-docker compose --profile full logs -f
+docker compose --profile app logs -f
 ```
 
 ### 5. Остановка
 
 ```bash
-docker compose --profile full down
+docker compose --profile app down
 ```
 
 ### 6. Сброс локальных данных
