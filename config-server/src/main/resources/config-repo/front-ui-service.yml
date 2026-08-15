@@ -29,3 +29,4 @@ api:
 
 server:
   port: 8085
+  forward-headers-strategy: framework
