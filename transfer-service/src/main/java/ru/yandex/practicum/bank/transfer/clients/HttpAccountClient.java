@@ -9,10 +9,11 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.viewmodels.ApiErrorResponseViewModel;
 import ru.yandex.practicum.bank.transfer.exceptions.AccountClientException;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferExecutor;
 import ru.yandex.practicum.bank.transfer.mappers.AccountTransferMapper;
-import ru.yandex.practicum.bank.transfer.providers.ServiceTokenProvider;
+import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
 import ru.yandex.practicum.bank.transfer.viewmodels.*;
 
 /**

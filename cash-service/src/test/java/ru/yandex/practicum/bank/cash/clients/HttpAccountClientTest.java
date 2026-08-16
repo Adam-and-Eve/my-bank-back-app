@@ -14,9 +14,9 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import ru.yandex.practicum.bank.cash.exceptions.AccountClientException;
 import ru.yandex.practicum.bank.cash.models.CurrencyEnumModel;
-import ru.yandex.practicum.bank.cash.providers.ServiceTokenProvider;
 import ru.yandex.practicum.bank.cash.viewmodels.AccountBalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
 
 import java.io.IOException;
 import java.math.BigDecimal;

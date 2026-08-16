@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.cash.configurations;
+package ru.yandex.practicum.bank.shared.configurations;
 
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.annotation.Bean;
@@ -7,9 +7,7 @@ import org.springframework.web.client.RestClient;
 
 /**
  * <summary>
- * Конфигурация RestClient для сервиса наличных операций (Cash Service).
- * Предоставляет строитель RestClient.Builder с поддержкой клиентской балансировки
- * нагрузки для межсервисного взаимодействия через Eureka.
+ * Общая конфигурация RestClient с поддержкой LoadBalancer (Eureka).
  * </summary>
  **/
 @Configuration
@@ -19,8 +17,8 @@ public class RestClientConfiguration {
 
     /**
      * <summary>
-     * Создает бин RestClient.Builder с аннотацией @LoadBalanced для выполнения HTTP-запросов
-     * к другим микросервисам по их логическим именам в реестре Eureka.
+     * Создает билдер RestClient.Builder с аннотацией @LoadBalanced для автоматической интеграции с Service Discovery (Eureka)
+     * и клиентской балансировкой нагрузки при обращении к микросервисам по их именам.
      * </summary>
      * <return>
      * @return Экземпляр RestClient.Builder с поддержкой балансировки нагрузки.

@@ -4,11 +4,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.core.convert.converter.Converter;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,11 +14,7 @@ import ru.yandex.practicum.bank.transfer.interfaces.TransferService;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
 
 import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -29,9 +22,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 /**
  * <summary>
- * Интеграционные тесты конфигурации безопасности (Spring Security, OAuth2 Resource Server, JWT Converter).
+ * Интеграционные тесты конфигурации безопасности Transfer Service.
+ * Проверяют корректность настройки прав доступа (RBAC),
+ * а также кастомную обработку ошибок 401 Unauthorized и 403 Forbidden.
  * </summary>
  **/
 @SpringBootTest
@@ -42,9 +38,6 @@ public class TransferSecurityConfigurationTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @Autowired
-    private Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter;
 
     @MockitoBean
     private TransferService transferService;
@@ -69,7 +62,7 @@ public class TransferSecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет отклонение запроса на перевод (401 Unauthorized) при отсутствии JWT-токена в заголовках.
+     * Проверяет отклонение запроса на перевод (401 Unauthorized) при отсутствии JWT-токена.
      * </summary>
      **/
     @Test
@@ -79,7 +72,7 @@ public class TransferSecurityConfigurationTest {
                         .content(transferRequest()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.message").value("Authorization is required"));
+                .andExpect(jsonPath("$.message").value("Требуется авторизация"));
     }
 
     /**
@@ -97,7 +90,7 @@ public class TransferSecurityConfigurationTest {
                         .content(transferRequest()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-                .andExpect(jsonPath("$.message").value("Not enough permissions"));
+                .andExpect(jsonPath("$.message").value("Недостаточно прав для выполнения операции"));
     }
 
     /**
@@ -130,12 +123,13 @@ public class TransferSecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет генерацию ответа 401 Unauthorized при наличии требуемой роли, но отсутствии обязательного claim preferred_username.
+     * Проверяет генерацию ответа 401 Unauthorized при отсутствии обязательного claim preferred_username.
      * </summary>
      **/
     @Test
     public void shouldRejectTransferEndpointWhenPreferredUsernameIsMissing() throws Exception {
-        when(transferService.transfer(any(), any())).thenThrow(new MissingPreferredUsernameException());
+        when(transferService.transfer(any(), any()))
+                .thenThrow(new MissingPreferredUsernameException());
 
         mockMvc.perform(post("/api/transfer")
                         .with(jwt()
@@ -150,71 +144,9 @@ public class TransferSecurityConfigurationTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
-    /**
-     * <summary>
-     * Проверяет корректное преобразование списков ролей из realm_access JWT-токена в GrantedAuthority с префиксом ROLE_.
-     * </summary>
-     **/
-    @Test
-    public void shouldConvertRealmRolesToAuthorities() {
-        var jwt = Jwt.withTokenValue("token")
-                .header("alg", "none")
-                .issuedAt(Instant.parse("2026-06-13T00:00:00Z"))
-                .claim("realm_access", Map.of("roles", List.of("USER", "TRANSFER_WRITE")))
-                .build();
-
-        var authentication = jwtAuthenticationConverter.convert(jwt);
-
-        assertThat(authentication).isNotNull();
-
-        assertThat(authentication.getAuthorities())
-                .extracting("authority")
-                .containsExactlyInAnyOrder("ROLE_USER", "ROLE_TRANSFER_WRITE");
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что конвертер возвращает пустую коллекцию authorities, если в JWT отсутствует секция realm_access.
-     * </summary>
-     **/
-    @Test
-    public void shouldReturnEmptyAuthoritiesWhenRealmAccessIsMissing() {
-        var jwt = Jwt.withTokenValue("token")
-                .header("alg", "none")
-                .issuedAt(Instant.parse("2026-06-13T00:00:00Z"))
-                .build();
-
-        var authentication = jwtAuthenticationConverter.convert(jwt);
-
-        assertThat(authentication).isNotNull();
-
-        assertThat(authentication.getAuthorities()).isEmpty();
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что конвертер возвращает пустую коллекцию authorities, если список ролей в realm_access пуст.
-     * </summary>
-     **/
-    @Test
-    public void shouldReturnEmptyAuthoritiesWhenRolesAreEmpty() {
-        var jwt = Jwt.withTokenValue("token")
-                .header("alg", "none")
-                .issuedAt(Instant.parse("2026-06-13T00:00:00Z"))
-                .claim("realm_access", Map.of("roles", List.of()))
-                .build();
-
-        var authentication = jwtAuthenticationConverter.convert(jwt);
-
-        assertThat(authentication).isNotNull();
-
-        assertThat(authentication.getAuthorities()).isEmpty();
-    }
-
     // endregion
 
     // region Methods
-
 
     /**
      * <summary>

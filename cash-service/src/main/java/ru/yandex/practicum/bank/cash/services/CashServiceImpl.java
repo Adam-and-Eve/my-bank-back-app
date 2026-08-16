@@ -5,11 +5,11 @@ import ru.yandex.practicum.bank.cash.exceptions.InvalidAmountException;
 import ru.yandex.practicum.bank.cash.exceptions.InvalidAmountScaleException;
 import ru.yandex.practicum.bank.cash.interfaces.AccountClient;
 import ru.yandex.practicum.bank.cash.interfaces.CashService;
-import ru.yandex.practicum.bank.cash.interfaces.NotificationClient;
+import ru.yandex.practicum.bank.shared.interfaces.NotificationClient;
 import ru.yandex.practicum.bank.cash.mappers.AccountBalanceMapper;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
-import ru.yandex.practicum.bank.cash.viewmodels.NotificationRequestViewModel;
+import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
 
 import java.math.BigDecimal;
 import java.util.UUID;

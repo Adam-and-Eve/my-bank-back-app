@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.transfer.viewmodels;
+package ru.yandex.practicum.bank.shared.viewmodels;
 
 /**
  * <summary>

@@ -1,20 +1,18 @@
-package ru.yandex.practicum.bank.cash.clients;
+package ru.yandex.practicum.bank.shared.clients;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import ru.yandex.practicum.bank.cash.exceptions.NotificationClientException;
-import ru.yandex.practicum.bank.cash.interfaces.NotificationClient;
-import ru.yandex.practicum.bank.cash.providers.ServiceTokenProvider;
-import ru.yandex.practicum.bank.cash.viewmodels.NotificationRequestViewModel;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.exceptions.NotificationClientException;
+import ru.yandex.practicum.bank.shared.interfaces.NotificationClient;
+import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
+import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
 
 /**
  * <summary>
- * Клиент для взаимодействия с сервисом счетов (Accounts Service).
- * Определяет контракт для выполнения финансовых операций пополнения и списания средств со счетов пользователей.
+ * HTTP-клиент для взаимодействия с сервисом уведомлений (Notification Service).
  * </summary>
  **/
 @Component
@@ -63,28 +61,29 @@ public class HttpNotificationClient implements NotificationClient {
 
     /**
      * <summary>
-     * Отправляет запрос на создание уведомления с оберткой в Circuit Breaker.
-     * При сбоях сервиса уведомлений ошибка глушится (fallback возвращает null), чтобы не блокировать основную бизнес-операцию.
+     * Отправляет запрос на создание уведомления с использованием паттерна Circuit Breaker.
+     * Сбои при отправке уведомлений мягко глушатся в fallback, чтобы не ломать основной бизнес-процесс перевода.
      * </summary>
-     * @param request Модель запроса на отправку уведомления NotificationRequestViewModel.
+     * @param request Данные запроса на отправку уведомления.
      **/
     @Override
     public void notify(NotificationRequestViewModel request) {
         circuitBreaker.execute(
                 () -> {
                     notifyWithoutCircuitBreaker(request);
+
                     return null;
                 },
                 exception -> null
         );
     }
 
-
     /**
      * <summary>
-     * Выполняет прямой HTTP POST-запрос к сервису уведомлений с добавлением OAuth2-токена авторизации.
+     * Отправляет POST-запрос с токеном авторизации Bearer в сервис уведомлений без обертки Circuit Breaker.
      * </summary>
-     * @param request Модель запроса на отправку уведомления NotificationRequestViewModel.
+     * @param request Данные запроса на отправку уведомления.
+     * @throws NotificationClientException При сетевых сбоях или ошибках взаимодействия с внешним сервисом.
      **/
     private void notifyWithoutCircuitBreaker(NotificationRequestViewModel request) {
         try {
@@ -95,7 +94,7 @@ public class HttpNotificationClient implements NotificationClient {
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException exception) {
-            throw new NotificationClientException("Notification service request failed", exception);
+            throw new NotificationClientException("Notifications service request failed", exception);
         }
     }
 

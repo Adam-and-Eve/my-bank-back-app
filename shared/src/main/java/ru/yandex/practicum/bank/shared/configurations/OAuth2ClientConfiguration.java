@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.cash.configurations;
+package ru.yandex.practicum.bank.shared.configurations;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,9 +10,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 
 /**
  * <summary>
- * Конфигурация OAuth2-клиента для сервиса наличных операций (Cash Service).
- * Настраивает менеджер авторизованных клиентов для получения токенов доступа
- * по схеме OAuth2 Client Credentials Flow при межсервисных запросах.
+ * Общая конфигурация OAuth2-клиента для межсервисных вызовов (Client Credentials Flow).
  * </summary>
  **/
 @Configuration
@@ -22,16 +20,16 @@ public class OAuth2ClientConfiguration {
 
     /**
      * <summary>
-     * Создает и конфигурирует менеджер авторизованных OAuth2-клиентов с поддержкой Client Credentials Flow.
+     * Создает и конфигурирует менеджер OAuth2AuthorizedClientManager с поддержкой Client Credentials Provider.
      * </summary>
      * @param clientRegistrationRepository Репозиторий регистраций OAuth2-клиентов.
-     * @param authorizedClientService Сервис для хранения и управления авторизованными OAuth2-клиентами.
+     * @param authorizedClientService Сервис хранения и управления авторизованными OAuth2-клиентами.
      * <return>
      * @return Сконфигурированный экземпляр OAuth2AuthorizedClientManager.
      * </return>
      **/
     @Bean
-    OAuth2AuthorizedClientManager authorizedClientManager(
+    public OAuth2AuthorizedClientManager authorizedClientManager(
             ClientRegistrationRepository clientRegistrationRepository,
             OAuth2AuthorizedClientService authorizedClientService
     ) {

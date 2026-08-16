@@ -1,13 +1,13 @@
 package ru.yandex.practicum.bank.transfer.services;
 
 import org.springframework.stereotype.Service;
+import ru.yandex.practicum.bank.shared.interfaces.NotificationClient;
 import ru.yandex.practicum.bank.transfer.exceptions.InvalidAmountException;
 import ru.yandex.practicum.bank.transfer.exceptions.InvalidAmountScaleException;
 import ru.yandex.practicum.bank.transfer.exceptions.SelfTransferForbiddenException;
-import ru.yandex.practicum.bank.transfer.interfaces.NotificationClient;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferExecutor;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferService;
-import ru.yandex.practicum.bank.transfer.viewmodels.NotificationRequestViewModel;
+import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferOperationViewModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferRequestViewModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;

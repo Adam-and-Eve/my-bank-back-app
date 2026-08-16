@@ -10,11 +10,11 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import ru.yandex.practicum.bank.cash.exceptions.AccountClientException;
 import ru.yandex.practicum.bank.cash.interfaces.AccountClient;
-import ru.yandex.practicum.bank.cash.providers.ServiceTokenProvider;
 import ru.yandex.practicum.bank.cash.viewmodels.AccountBalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.AccountBalanceResponseViewModel;
-import ru.yandex.practicum.bank.cash.viewmodels.ApiErrorResponseViewModel;
 import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
+import ru.yandex.practicum.bank.shared.viewmodels.ApiErrorResponseViewModel;
 
 /**
  * <summary>

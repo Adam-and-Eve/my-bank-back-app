@@ -1,6 +1,6 @@
-package ru.yandex.practicum.bank.cash.interfaces;
+package ru.yandex.practicum.bank.shared.interfaces;
 
-import ru.yandex.practicum.bank.cash.viewmodels.NotificationRequestViewModel;
+import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
 
 /**
  * <summary>

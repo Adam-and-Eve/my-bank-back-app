@@ -16,7 +16,7 @@ import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
 import ru.yandex.practicum.bank.transfer.exceptions.AccountClientException;
 import ru.yandex.practicum.bank.transfer.mappers.AccountTransferMapper;
 import ru.yandex.practicum.bank.transfer.models.CurrencyEnumModel;
-import ru.yandex.practicum.bank.transfer.providers.ServiceTokenProvider;
+import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
 import ru.yandex.practicum.bank.transfer.viewmodels.AccountTransferRequestViewModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferOperationViewModel;
 

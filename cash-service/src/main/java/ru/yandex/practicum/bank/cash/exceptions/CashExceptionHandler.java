@@ -5,7 +5,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import ru.yandex.practicum.bank.cash.viewmodels.ApiErrorResponseViewModel;
+import ru.yandex.practicum.bank.shared.exceptions.NotificationClientException;
+import ru.yandex.practicum.bank.shared.viewmodels.ApiErrorResponseViewModel;
 
 /**
  * <summary>
@@ -73,7 +74,7 @@ public class CashExceptionHandler {
      **/
     @ExceptionHandler(MissingPreferredUsernameException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
-    public ApiErrorResponseViewModel VhandleMissingPreferredUsername(MissingPreferredUsernameException exception) {
+    public ApiErrorResponseViewModel handleMissingPreferredUsername(MissingPreferredUsernameException exception) {
         return new ApiErrorResponseViewModel("UNAUTHORIZED", exception.getMessage());
     }
 

@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.cash.clients;
+package ru.yandex.practicum.bank.shared.clients;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,11 +8,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
-import ru.yandex.practicum.bank.cash.providers.ServiceTokenProvider;
-import ru.yandex.practicum.bank.cash.viewmodels.NotificationRequestViewModel;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
+import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
 
 import java.io.IOException;
 
@@ -28,8 +28,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 /**
  * <summary>
  * Модульные тесты для HTTP-клиента сервиса уведомлений HttpNotificationClient.
- * Проверяют корректность отправки запросов на уведомление, передачу OAuth2-токена,
- * а также работу Circuit Breaker (fire-and-forget), при котором ошибки глушатся и не ломают вызывающий код.
+ * Проверяют корректность отправки POST-запросов, передачи Bearer-токена,
+ * а также гарантированное отсутствие выброса исключений при сетевых сбоях и ошибках сервера (fail-silent поведение).
  * </summary>
  **/
 @ExtendWith(MockitoExtension.class)
@@ -41,7 +41,7 @@ public class HttpNotificationClientTest {
 
     private static final String NOTIFICATION_URI = BASE_URL + "/api/notification";
 
-    private static final String TEST_TOKEN = "secret-cash-service-jwt-token";
+    private static final String TEST_TOKEN = "secret-service-jwt-token";
 
     // endregion
 
@@ -80,7 +80,7 @@ public class HttpNotificationClientTest {
 
     /**
      * <summary>
-     * Проверяет успешную отправку POST-запроса на создание уведомления с Bearer-токеном.
+     * Проверяет успешную отправку POST-запроса на создание уведомления с корректным Bearer-токеном и заголовками.
      * </summary>
      **/
     @Test
@@ -93,9 +93,9 @@ public class HttpNotificationClientTest {
                 .andRespond(withSuccess());
 
         var request = new NotificationRequestViewModel(
-                "alexey",
-                "CASH_DEPOSIT",
-                "Счёт пополнен на 500.00 RUB",
+                "dmitry",
+                "TRANSFER_COMPLETED",
+                "Transfer completed to alexey: 500.00 RUB",
                 "op-123"
         );
 
@@ -107,63 +107,72 @@ public class HttpNotificationClientTest {
 
     /**
      * <summary>
-     * Проверяет, что при HTTP-ошибке 500 от сервиса уведомлений исключение глушится (fire-and-forget fallback).
+     * Проверяет, что при ответе 500 Internal Server Error от сервиса уведомлений ошибка поглощается (fail-silent)
+     * и не выбрасывается исключение в вызывающий слой.
      * </summary>
      **/
     @Test
-    public void shouldNotThrowExceptionWhenNotificationServiceReturnsHttpError() {
+    public void shouldSwallowExceptionOnHttpServerError() {
         when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
 
         mockServer.expect(requestTo(NOTIFICATION_URI))
-                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR));
+                .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Internal Server Error")
+                        .contentType(MediaType.TEXT_PLAIN));
 
         var request = new NotificationRequestViewModel(
-                "alexey",
-                "CASH_DEPOSIT",
-                "Счёт пополнен на 500.00 RUB",
+                "dmitry",
+                "TRANSFER_COMPLETED",
+                "Transfer completed to alexey: 500.00 RUB",
                 "op-123"
         );
 
         assertThatCode(() -> notificationClient.notify(request))
                 .doesNotThrowAnyException();
+
+        mockServer.verify();
     }
 
     /**
      * <summary>
-     * Проверяет, что при сетевом сбое (IOException) исключение глушится и не выбрасывается наружу.
+     * Проверяет, что при сетевом сбое (IOException / Connection Refused) клиент мягко гасит ошибку
+     * и позволяет основному процессу перевода завершиться без сбоя.
      * </summary>
      **/
     @Test
-    public void shouldNotThrowExceptionWhenNetworkFailureOccurs() {
+    public void shouldSwallowExceptionOnNetworkFailure() {
         when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
 
         mockServer.expect(requestTo(NOTIFICATION_URI))
                 .andRespond(withException(new IOException("Connection refused")));
 
         var request = new NotificationRequestViewModel(
-                "alexey",
-                "CASH_DEPOSIT",
-                "Счёт пополнен на 500.00 RUB",
+                "dmitry",
+                "TRANSFER_COMPLETED",
+                "Transfer completed to alexey: 500.00 RUB",
                 "op-123"
         );
 
         assertThatCode(() -> notificationClient.notify(request))
                 .doesNotThrowAnyException();
+
+        mockServer.verify();
     }
 
     /**
      * <summary>
-     * Проверяет, что при сбое получения OAuth2-токена Circuit Breaker перехватывает ошибку и не ломает выполнение.
+     * Проверяет, что при ошибке провайдера токенов (например, недоступен Keycloak/OAuth2 Identity Provider)
+     * Circuit Breaker отрабатывает fallback и мягко поглощает исключение.
      * </summary>
      **/
     @Test
-    public void shouldNotThrowExceptionWhenTokenProviderFails() {
-        when(serviceTokenProvider.getAccessToken()).thenThrow(new RuntimeException("OAuth2 Identity Provider unavailable"));
+    public void shouldSwallowExceptionWhenTokenProviderFails() {
+        when(serviceTokenProvider.getAccessToken()).thenThrow(new RuntimeException("OAuth2 Provider unavailable"));
 
         var request = new NotificationRequestViewModel(
-                "alexey",
-                "CASH_DEPOSIT",
-                "Счёт пополнен на 500.00 RUB",
+                "dmitry",
+                "TRANSFER_COMPLETED",
+                "Transfer completed to alexey: 500.00 RUB",
                 "op-123"
         );
 
@@ -172,4 +181,5 @@ public class HttpNotificationClientTest {
     }
 
     // endregion
+
 }
