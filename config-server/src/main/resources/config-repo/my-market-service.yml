@@ -15,8 +15,8 @@ spring:
 
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
       repositories:
         enabled: false
 
@@ -24,14 +24,13 @@ spring:
     oauth2:
       client:
         registration:
-          keycloak:
+          my-market-service:
             provider: keycloak
-            client-id: ${KEYCLOAK_LOGIN_CLIENT_ID:my-market-service}
-            client-secret: ${KEYCLOAK_LOGIN_CLIENT_SECRET:}
+            client-id: my-market-service
+            client-secret: ${MY_MARKET_SERVICE_CLIENT_SECRET:}
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope: openid,profile,email
-
         provider:
           keycloak:
             authorization-uri: ${BANK_KEYCLOAK_AUTHORIZATION_URI:http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/auth}
@@ -47,10 +46,9 @@ app:
 api:
   gateway:
     base-url: ${API_GATEWAY_URL:http://localhost:8080}
-
   security:
-    keycloak:
-      logout-uri: ${BANK_KEYCLOAK_END_SESSION_URI:http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout}
+    logout:
+      end-session-uri: ${BANK_KEYCLOAK_END_SESSION_URI:http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout}
 
 eureka:
   client:
