@@ -1,10 +1,7 @@
 package ru.yandex.practicum.bank.account.services;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -52,6 +49,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
     public IdempotencyServiceImpl(
             ProcessedOperationRepository operationRepository,
             PlatformTransactionManager transactionManager,
+            ObjectMapper objectMapper,
             Clock clock
     ) {
         this.operationRepository = Objects.requireNonNull(operationRepository, "Operation repository must not be null");
@@ -62,11 +60,7 @@ public class IdempotencyServiceImpl implements IdempotencyService {
 
         this.operationTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
 
-        this.objectMapper = JsonMapper.builder()
-                .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
-                .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-                .findAndAddModules()
-                .build();
+        this.objectMapper = objectMapper;
 
         this.clock = Objects.requireNonNull(clock, "Clock must not be null");
     }

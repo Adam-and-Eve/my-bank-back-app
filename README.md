@@ -94,7 +94,7 @@ docker compose --profile app up --build -d
 ### 3. Проверка статуса
 
 ```bash
-docker compose --profile app up --build -d
+docker compose --profile app ps
 ```
 
 ### 4. Просмотр логов

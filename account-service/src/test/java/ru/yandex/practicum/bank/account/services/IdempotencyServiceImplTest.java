@@ -1,5 +1,9 @@
 package ru.yandex.practicum.bank.account.services;
 
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -71,6 +75,8 @@ public class IdempotencyServiceImplTest {
     @Mock
     private TransactionStatus transactionStatus;
 
+    private ObjectMapper objectMapper;
+
     private Clock fixedClock;
 
     private IdempotencyServiceImpl idempotencyService;
@@ -83,6 +89,12 @@ public class IdempotencyServiceImplTest {
     public void setUp() {
         fixedClock = Clock.fixed(FIXED_INSTANT, UTC);
 
+        objectMapper = JsonMapper.builder()
+                .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+                .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+                .findAndAddModules()
+                .build();
+
         org.mockito.Mockito.lenient()
                 .when(transactionManager.getTransaction(any(TransactionDefinition.class)))
                 .thenReturn(transactionStatus);
@@ -90,6 +102,7 @@ public class IdempotencyServiceImplTest {
         idempotencyService = new IdempotencyServiceImpl(
                 operationRepository,
                 transactionManager,
+                objectMapper,
                 fixedClock
         );
     }
