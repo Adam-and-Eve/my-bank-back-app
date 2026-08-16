@@ -1,0 +1,31 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+  security:
+    oauth2:
+      client:
+        registration:
+          cash-service:
+            provider: keycloak
+            authorization-grant-type: client_credentials
+            client-id: cash-service
+            client-secret: test-secret
+        provider:
+          keycloak:
+            token-uri: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/token
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8180/realms/my-bank-realm
+          jwk-set-uri: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/certs
+
+bank:
+  services:
+    account:
+      base-url: http://account-service
+    notification:
+      base-url: http://notification-service
+
+eureka:
+  client:
+    enabled: false

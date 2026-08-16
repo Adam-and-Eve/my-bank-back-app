@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          routes:
+            - id: block-account-internal-api
+              uri: no://op
+              predicates:
+                - Path=/api/account/internal/**
+              filters:
+                - SetStatus=404
+            - id: account-service
+              uri: lb://account-service
+              predicates:
+                - Path=/api/account/**
+              filters:
+                - JwtTokenRelay
+            - id: cash-service
+              uri: lb://cash-service
+              predicates:
+                - Path=/api/cash/**
+              filters:
+                - JwtTokenRelay
+            - id: transfer-service
+              uri: lb://transfer-service
+              predicates:
+                - Path=/api/transfer
+              filters:
+                - JwtTokenRelay
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${BANK_KEYCLOAK_ISSUER_URI:http://localhost:8180/realms/my-bank-realm}
+          jwk-set-uri: ${BANK_KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/certs}
+
+server:
+  port: 8080

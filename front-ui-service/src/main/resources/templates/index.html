@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="ru" xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>МОЙ БАНК</title>
+        <link rel="stylesheet" th:href="@{/css/main.css}">
+    </head>
+
+    <body>
+        <main class="page">
+
+            <header class="topbar">
+                <div>
+                    <p class="eyebrow">СКАМ БАНК // ЧАСТНАЯ БАНКОВСКАЯ СИСТЕМА</p>
+                    <h1>МОЙ<span>-</span>БАНК</h1>
+                    <div class="status-line">
+                        <i></i>
+                        ЗАЩИЩЁННОЕ СОЕДИНЕНИЕ УСТАНОВЛЕНО
+                    </div>
+                </div>
+
+                <div class="user">
+                    <div class="user-info">
+                        <span class="user-label">ВЛАДЕЛЕЦ СЧЁТА</span>
+                        <strong th:text="${username}">user</strong>
+                    </div>
+
+                    <form th:action="@{/logout}" method="post">
+                        <button type="submit" class="secondary">Выйти</button>
+                    </form>
+                </div>
+            </header>
+
+            <div class="message success" th:if="${successMessage}" th:text="${successMessage}"></div>
+            <div class="message error" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <section class="layout">
+
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-code">01 / ЛИЧНЫЕ ДАННЫЕ</span>
+                            <h2>Обо мне</h2>
+                        </div>
+                        <span class="panel-icon">◆</span>
+                    </div>
+
+                    <form class="account-form"
+                          method="post"
+                          th:action="@{/account}"
+                          th:object="${accountForm}">
+
+                        <input type="hidden"
+                               th:name="${_csrf.parameterName}"
+                               th:value="${_csrf.token}">
+
+                        <label>
+                            Фамилия и имя
+                            <input type="text"
+                                   th:field="*{name}"
+                                   autocomplete="name"
+                                   minlength="2"
+                                   maxlength="120">
+                        </label>
+
+                        <label>
+                            Дата рождения
+                            <input type="date" th:field="*{birthdate}">
+                        </label>
+
+                        <div class="balance">
+                            <span>ТЕКУЩИЙ БАЛАНС</span>
+                            <strong>
+                                <span th:text="${balance}">0.00</span>
+                                <small th:text="${currency}">RUB</small>
+                            </strong>
+                        </div>
+
+                        <p class="inline-error"
+                           th:if="${accountLoadError}"
+                           th:text="${accountLoadError}">
+                        </p>
+
+                        <button type="submit">СОХРАНИТЬ ДАННЫЕ</button>
+                    </form>
+                </article>
+
+                <article class="panel">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-code">02 / ОПЕРАЦИИ С НАЛИЧНЫМИ</span>
+                            <h2>Операции с наличными</h2>
+                        </div>
+                        <span class="panel-icon warning">!</span>
+                    </div>
+
+                    <div class="warning-box">
+                        <strong>⚠ ВНИМАНИЕ</strong>
+                        <span>Операции являются необратимыми.</span>
+                    </div>
+
+                    <form class="cash-form"
+                          method="post"
+                          th:action="@{/cash}"
+                          th:object="${cashForm}">
+
+                        <input type="hidden"
+                               th:name="${_csrf.parameterName}"
+                               th:value="${_csrf.token}">
+
+                        <label>
+                            Сумма
+                            <input type="number"
+                                   th:field="*{amount}"
+                                   min="0.01"
+                                   step="0.01">
+                        </label>
+
+                        <input type="hidden" th:field="*{currency}">
+
+                        <div class="actions">
+                            <button type="submit" name="action" value="deposit">
+                                + ПОЛОЖИТЬ
+                            </button>
+
+                            <button type="submit"
+                                    name="action"
+                                    value="withdraw"
+                                    class="danger-button">
+                                − СНЯТЬ
+                            </button>
+                        </div>
+                    </form>
+                </article>
+
+                <article class="panel wide">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-code">03 / ДЕНЕЖНЫЕ ПЕРЕВОДЫ</span>
+                            <h2>Переводы</h2>
+                        </div>
+                        <span class="panel-icon">↗</span>
+                    </div>
+
+                    <div class="transfer-warning">
+                        <span class="warning-symbol">!</span>
+                        <div>
+                            <strong>ПРОВЕРЬТЕ РЕКВИЗИТЫ</strong>
+                            <small>
+                                После подтверждения перевод будет отправлен
+                                в банковскую сеть.
+                            </small>
+                        </div>
+                    </div>
+
+                    <form class="transfer-form"
+                          th:action="@{/transfers}"
+                          th:object="${transferForm}"
+                          method="post">
+
+                        <input type="hidden"
+                               th:name="${_csrf.parameterName}"
+                               th:value="${_csrf.token}">
+
+                        <label>
+                            Получатель
+                            <select th:field="*{recipientLogin}">
+                                <option value="">Выберите получателя</option>
+
+                                <option th:each="recipient : ${recipients}"
+                                        th:value="${recipient.login()}"
+                                        th:text="${recipient.name() + ' (' + recipient.login() + ')'}">
+                                    Петр
+                                </option>
+                            </select>
+                        </label>
+
+                        <label>
+                            Сумма
+                            <input type="number"
+                                   th:field="*{amount}"
+                                   min="0.01"
+                                   step="0.01">
+                        </label>
+
+                        <label>
+                            Валюта
+                            <select th:field="*{currency}">
+                                <option value="RUB">RUB</option>
+                            </select>
+                        </label>
+
+                        <button type="submit">
+                            ОТПРАВИТЬ
+                        </button>
+                    </form>
+
+                    <p class="inline-error"
+                       th:if="${recipientsLoadError}"
+                       th:text="${recipientsLoadError}">
+                    </p>
+
+                    <div class="result" th:if="${transferResponse}">
+                        <span>ПОЛУЧАТЕЛЬ</span>
+                        <strong th:text="${transferResponse.recipientLogin()}">petr</strong>
+
+                        <span>ОСТАТОК</span>
+                        <strong>
+                            <span th:text="${transferResponse.senderBalance()}">800.00</span>
+                            <span th:text="${transferResponse.currency()}">RUB</span>
+                        </strong>
+
+                        <span>СТАТУС</span>
+                        <strong class="result-success">ОПЕРАЦИЯ ВЫПОЛНЕНА</strong>
+                    </div>
+                </article>
+
+            </section>
+
+            <footer>
+                <span>СКАМ БАНК © 2026</span>
+                <span>ВНУТРЕННИЙ БАНКОВСКИЙ ТЕРМИНАЛ</span>
+                <span>СЕАНС ЗАЩИЩЁН</span>
+            </footer>
+
+        </main>
+    </body>
+</html>

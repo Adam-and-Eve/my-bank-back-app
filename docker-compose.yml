@@ -1,0 +1,284 @@
+x-app-health: &app-health
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 30s
+
+x-platform-health: &platform-health
+  interval: 10s
+  timeout: 5s
+  retries: 12
+  start_period: 20s
+
+x-config-client-env: &config-client-env
+  BANK_CONFIG_IMPORT: configserver:http://config-server:8888
+  BANK_EUREKA_DEFAULT_ZONE: http://discovery-server:8761/eureka/
+
+x-resource-server-env: &resource-server-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+
+x-api-gateway-env: &api-gateway-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+
+x-notification-service-env: &notification-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+
+x-transfer-service-env: &transfer-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  TRANSFER_SERVICE_CLIENT_SECRET: ${TRANSFER_SERVICE_CLIENT_SECRET:-__TRANSFER_SERVICE_CLIENT_SECRET__}
+  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+
+x-cash-service-env: &cash-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  CASH_SERVICE_CLIENT_SECRET: ${CASH_SERVICE_CLIENT_SECRET:-__CASH_SERVICE_CLIENT_SECRET__}
+  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+
+x-account-service-env: &account-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bank
+  BANK_DATASOURCE_USERNAME: postgres
+
+x-front-ui-service-env: &front-ui-service-env
+  <<: *config-client-env
+  FRONT_UI_SERVICE_CLIENT_SECRET: ${FRONT_UI_SERVICE_CLIENT_SECRET:-__FRONT_UI_SERVICE_CLIENT_SECRET__}
+  BANK_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/auth
+  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_KEYCLOAK_USER_INFO_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/userinfo
+  BANK_KEYCLOAK_END_SESSION_URI: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout
+  API_GATEWAY_URL: http://api-gateway:8080
+
+services:
+  postgres:
+    image: postgres:18
+    container_name: postgres
+    profiles:
+      - infra
+      - app
+      - deploy
+    environment:
+      POSTGRES_DB: bank
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d bank" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    networks: [ bank-network ]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.6.3
+    container_name: keycloak
+    profiles:
+      - infra
+      - app
+      - deploy
+    command: [ "start-dev", "--import-realm" ]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-__KEYCLOAK_ADMIN_USERNAME__}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-__KEYCLOAK_ADMIN_PASSWORD__}
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME: http://localhost:8180
+      KC_HTTP_PORT: 8080
+    ports:
+      - "8180:8080"
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8080'" ]
+    volumes:
+      - ./keycloak/realms:/opt/keycloak/data/import:ro
+    networks: [ bank-network ]
+
+  config-server:
+    build:
+      context: ./config-server
+    image: my-bank-config-server:local
+    container_name: config-server
+    profiles:
+      - infra
+      - app
+      - deploy
+    ports:
+      - "8888:8888"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      <<: *platform-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8888'" ]
+    networks: [ bank-network ]
+
+  discovery-server:
+    build:
+      context: ./discovery-server
+    image: my-bank-discovery-server:local
+    container_name: discovery-server
+    profiles:
+      - infra
+      - app
+      - deploy
+    environment:
+      <<: *config-client-env
+    ports:
+      - "8761:8761"
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      <<: *platform-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8761'" ]
+    networks: [ bank-network ]
+
+  notification-service:
+    build:
+      context: ./notification-service
+    image: my-bank-notification-service:local
+    container_name: notification-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *notification-service-env
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8084'" ]
+    networks: [ bank-network ]
+
+  cash-service:
+    build:
+      context: ./cash-service
+    image: my-bank-cash-service:local
+    container_name: cash-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *cash-service-env
+    depends_on:
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8082'" ]
+    networks: [ bank-network ]
+
+  transfer-service:
+    build:
+      context: ./transfer-service
+    image: my-bank-transfer-service:local
+    container_name: transfer-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *transfer-service-env
+    depends_on:
+      notification-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8083'" ]
+    networks: [ bank-network ]
+
+  account-service:
+    build:
+      context: ./account-service
+    image: my-bank-account-service:local
+    container_name: account-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *account-service-env
+    depends_on:
+      cash-service:
+        condition: service_healthy
+      transfer-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8081'" ]
+    networks: [ bank-network ]
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+    image: my-bank-api-gateway:local
+    container_name: api-gateway
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *api-gateway-env
+    ports:
+      - "8080:8080"
+    depends_on:
+      account-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8080'" ]
+    networks: [ bank-network ]
+
+  front-ui-service:
+    build:
+      context: ./front-ui-service
+    image: my-bank-front-ui-service:local
+    container_name: front-ui-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *front-ui-service-env
+    ports:
+      - "8085:8085"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8085'" ]
+    networks: [ bank-network ]
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    profiles:
+      - deploy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      front-ui-service:
+        condition: service_healthy
+    networks: [ bank-network ]
+
+volumes:
+  postgres-data:
+
+networks:
+  bank-network:
+    name: bank-network
