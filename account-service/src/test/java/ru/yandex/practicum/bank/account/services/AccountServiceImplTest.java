@@ -9,11 +9,11 @@ import ru.yandex.practicum.bank.account.exceptions.AccountNotFoundException;
 import ru.yandex.practicum.bank.account.exceptions.InvalidBirthdateException;
 import ru.yandex.practicum.bank.account.mappers.AccountMapper;
 import ru.yandex.practicum.bank.account.models.AccountModel;
-import ru.yandex.practicum.bank.account.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.account.repositories.AccountRepository;
 import ru.yandex.practicum.bank.account.viewmodels.AccountResponseViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.RecipientResponseViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.UpdateAccountRequestViewModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
 import java.time.Clock;

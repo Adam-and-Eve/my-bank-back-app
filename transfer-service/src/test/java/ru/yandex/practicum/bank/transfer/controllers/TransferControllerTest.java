@@ -10,7 +10,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.bank.transfer.exceptions.MissingPreferredUsernameException;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferService;
-import ru.yandex.practicum.bank.transfer.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
 
 import java.math.BigDecimal;

@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.account.models;
+package ru.yandex.practicum.bank.shared.models;
 
 /**
  * <summary>
@@ -6,5 +6,7 @@ package ru.yandex.practicum.bank.account.models;
  * </summary>
  **/
 public enum CurrencyEnumModel {
-    RUB
+    RUB,
+    USD,
+    CNY
 }

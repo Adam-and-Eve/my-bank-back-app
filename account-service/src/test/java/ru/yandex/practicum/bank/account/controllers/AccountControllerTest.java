@@ -103,7 +103,9 @@ public class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.login").value("dmitry"))
                 .andExpect(jsonPath("$.name").value("Дмитрий Волков"))
-                .andExpect(jsonPath("$.birthdate").value("1999-09-19"))
+                .andExpect(jsonPath("$.birthdate[0]").value(1999))
+                .andExpect(jsonPath("$.birthdate[1]").value(9))
+                .andExpect(jsonPath("$.birthdate[2]").value(19))
                 .andExpect(jsonPath("$.balance").value(1000000.00))
                 .andExpect(jsonPath("$.currency").value("RUB"));
 

@@ -19,10 +19,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 import ru.yandex.practicum.bank.account.exceptions.*;
 import ru.yandex.practicum.bank.account.interfaces.BalanceOperationService;
 import ru.yandex.practicum.bank.account.models.AccountModel;
-import ru.yandex.practicum.bank.account.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.account.repositories.AccountRepository;
 import ru.yandex.practicum.bank.account.viewmodels.BalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.TransferBalanceRequestViewModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

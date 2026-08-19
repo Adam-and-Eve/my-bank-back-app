@@ -2,7 +2,7 @@ package ru.yandex.practicum.bank.transfer.viewmodels;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import ru.yandex.practicum.bank.transfer.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
 
