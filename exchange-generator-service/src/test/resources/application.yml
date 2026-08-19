@@ -1,0 +1,20 @@
+spring:
+  cloud:
+    config:
+      enabled: false
+  security:
+    oauth2:
+      client:
+        registration:
+          exchange-generator-service:
+            provider: keycloak
+            authorization-grant-type: client_credentials
+            client-id: exchange-generator-service
+            client-secret: test-secret
+        provider:
+          keycloak:
+            token-uri: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/token
+
+eureka:
+  client:
+    enabled: false
