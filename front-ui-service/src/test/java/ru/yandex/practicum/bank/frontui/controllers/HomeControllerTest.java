@@ -81,6 +81,14 @@ public class HomeControllerTest {
 
     @BeforeEach
     void setUp() {
+        when(securityUserContext.getAccessToken(any())).thenReturn(ACCESS_TOKEN);
+
+        when(gatewayClient.getAccount(any())).thenReturn(mock());
+
+        when(gatewayClient.getRecipients(any())).thenReturn(Collections.emptyList());
+
+        when(gatewayClient.getExchangeRates(any())).thenReturn(Collections.emptyList());
+
         doAnswer((Answer<Void>) invocation -> {
             Model model = invocation.getArgument(0);
 
@@ -90,22 +98,17 @@ public class HomeControllerTest {
             model.addAttribute("recipients", Collections.emptyList());
 
             if (!model.containsAttribute("accountForm")) {
-                model.addAttribute("accountForm",
-                        new AccountFormViewModel("Dmitry", LocalDate.of(1995, 5, 15)));
+                model.addAttribute("accountForm", new AccountFormViewModel("Dmitry", LocalDate.of(1995, 5, 15)));
             }
             if (!model.containsAttribute("cashForm")) {
-                model.addAttribute("cashForm",
-                        new CashFormViewModel(new BigDecimal("100.00"), "RUB"));
+                model.addAttribute("cashForm", new CashFormViewModel(new BigDecimal("100.00"), "RUB"));
             }
             if (!model.containsAttribute("transferForm")) {
-                model.addAttribute("transferForm",
-                        new TransferFormViewModel("", new BigDecimal("100.00"), "RUB"));
+                model.addAttribute("transferForm", new TransferFormViewModel("", new BigDecimal("100.00"), "RUB"));
             }
 
             model.addAttribute("_csrf", new org.springframework.security.web.csrf.DefaultCsrfToken(
-                    "X-CSRF-TOKEN",
-                    "_csrf",
-                    "test-csrf-token"
+                    "X-CSRF-TOKEN", "_csrf", "test-csrf-token"
             ));
 
             return null;
@@ -127,18 +130,11 @@ public class HomeControllerTest {
 
         when(authentication.getName()).thenReturn(USERNAME);
 
-        mockMvc.perform(
-                        get("/")
-                                .principal(authentication)
-                )
+        mockMvc.perform(get("/").principal(authentication))
                 .andExpect(status().isOk())
                 .andExpect(view().name("index"));
 
-        verify(modelFactory).populateMainPageModel(
-                any(),
-                eq(authentication),
-                eq(authentication)
-        );
+        verify(modelFactory).populateMainPageModel(any(), eq(authentication), eq(authentication));
     }
 
     // endregion
@@ -154,29 +150,18 @@ public class HomeControllerTest {
     public void shouldUpdateAccountSuccessfully() throws Exception {
         Authentication authentication = mock(Authentication.class);
 
-        when(securityUserContext.getAccessToken(authentication))
-                .thenReturn(ACCESS_TOKEN);
-
-        mockMvc.perform(
-                        post("/account")
-                                .with(csrf())
-                                .principal(authentication)
-                                .param("name", "Dmitry")
-                                .param("birthdate", "1995-05-15")
-                )
+        mockMvc.perform(post("/account")
+                        .with(csrf())
+                        .principal(authentication)
+                        .param("name", "Dmitry")
+                        .param("birthdate", "1995-05-15"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
-                .andExpect(flash().attribute(
-                        "successMessage",
-                        "Данные аккаунта сохранены"
-                ));
+                .andExpect(flash().attribute("successMessage", "Данные аккаунта сохранены"));
 
         verify(securityUserContext).getAccessToken(authentication);
 
-        verify(gatewayClient).updateAccount(
-                eq(ACCESS_TOKEN),
-                any()
-        );
+        verify(gatewayClient).updateAccount(eq(ACCESS_TOKEN), any());
     }
 
     /**
@@ -188,37 +173,21 @@ public class HomeControllerTest {
     public void shouldHandleGatewayErrorWhenUpdatingAccount() throws Exception {
         Authentication authentication = mock(Authentication.class);
 
-        when(securityUserContext.getAccessToken(authentication))
-                .thenReturn(ACCESS_TOKEN);
-
         doThrow(new GatewayClientException("Ошибка обновления аккаунта"))
-                .when(gatewayClient)
-                .updateAccount(eq(ACCESS_TOKEN), any());
+                .when(gatewayClient).updateAccount(eq(ACCESS_TOKEN), any());
 
-        mockMvc.perform(
-                        post("/account")
-                                .with(csrf())
-                                .principal(authentication)
-                                .param("name", "Dmitry")
-                                .param("birthdate", "1995-05-15")
-                )
+        mockMvc.perform(post("/account")
+                        .with(csrf())
+                        .principal(authentication)
+                        .param("name", "Dmitry")
+                        .param("birthdate", "1995-05-15"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
-                .andExpect(flash().attribute(
-                        "errorMessage",
-                        "Ошибка обновления аккаунта"
-                ));
+                .andExpect(flash().attribute("errorMessage", "Ошибка обновления аккаунта"));
 
-        verify(gatewayClient).updateAccount(
-                eq(ACCESS_TOKEN),
-                any()
-        );
+        verify(gatewayClient).updateAccount(eq(ACCESS_TOKEN), any());
 
-        verify(modelFactory, never()).populateMainPageModel(
-                any(),
-                any(),
-                any()
-        );
+        verify(modelFactory, never()).populateMainPageModel(any(), any(), any());
     }
 
     /**
@@ -230,29 +199,17 @@ public class HomeControllerTest {
     public void shouldReturnMainPageWhenAccountValidationFails() throws Exception {
         Authentication authentication = mock(Authentication.class);
 
-        mockMvc.perform(
-                        post("/account")
-                                .with(csrf())
-                                .principal(authentication)
-                                .param("name", "")
-                )
+        mockMvc.perform(post("/account")
+                        .with(csrf())
+                        .principal(authentication)
+                        .param("name", ""))
                 .andExpect(status().isOk())
                 .andExpect(view().name("index"))
-                .andExpect(model().attribute(
-                        "errorMessage",
-                        "Заполните имя и дату рождения"
-                ));
+                .andExpect(model().attribute("errorMessage", "Заполните имя и дату рождения"));
 
-        verify(modelFactory).populateMainPageModel(
-                any(),
-                eq(authentication),
-                eq(authentication)
-        );
+        verify(modelFactory).populateMainPageModel(any(), eq(authentication), eq(authentication));
 
-        verify(gatewayClient, never()).updateAccount(
-                any(),
-                any()
-        );
+        verify(gatewayClient, never()).updateAccount(any(), any());
 
         verify(securityUserContext, never()).getAccessToken(any());
     }
@@ -270,44 +227,25 @@ public class HomeControllerTest {
     public void shouldDepositCashSuccessfully() throws Exception {
         Authentication authentication = mock(Authentication.class);
 
-        CashOperationResponseViewModel response =
-                mock(CashOperationResponseViewModel.class);
+        CashOperationResponseViewModel response = mock(CashOperationResponseViewModel.class);
 
-        when(securityUserContext.getAccessToken(authentication))
-                .thenReturn(ACCESS_TOKEN);
+        when(response.message()).thenReturn("Счёт пополнен");
 
-        when(response.message())
-                .thenReturn("Счёт пополнен");
+        when(gatewayClient.deposit(eq(ACCESS_TOKEN), any())).thenReturn(response);
 
-        when(gatewayClient.deposit(eq(ACCESS_TOKEN), any()))
-                .thenReturn(response);
-
-        mockMvc.perform(
-                        post("/cash")
-                                .with(csrf())
-                                .principal(authentication)
-                                .param("amount", "100.00")
-                                .param("currency", "RUB")
-                                .param("action", "deposit")
-                )
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/"))
-                .andExpect(flash().attribute(
-                        "successMessage",
-                        "Счёт пополнен"
-                ));
+        mockMvc.perform(post("/cash")
+                .with(csrf())
+                .principal(authentication)
+                .param("amount", "100.00")
+                .param("currency", "RUB")
+                .param("action", "deposit")
+                .param("idempotencyKey", "test-deposit-123"));
 
         verify(securityUserContext).getAccessToken(authentication);
 
-        verify(gatewayClient).deposit(
-                eq(ACCESS_TOKEN),
-                any()
-        );
+        verify(gatewayClient).deposit(eq(ACCESS_TOKEN), any());
 
-        verify(gatewayClient, never()).withdraw(
-                any(),
-                any()
-        );
+        verify(gatewayClient, never()).withdraw(any(), any());
     }
 
     /**
@@ -338,6 +276,7 @@ public class HomeControllerTest {
                                 .param("amount", "100.00")
                                 .param("currency", "RUB")
                                 .param("action", "withdraw")
+                                .param("idempotencyKey", "test-idempotency-key")
                 )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
@@ -378,6 +317,7 @@ public class HomeControllerTest {
                                 .param("amount", "100.00")
                                 .param("currency", "RUB")
                                 .param("action", "unknown")
+                                .param("idempotencyKey", "test-idempotency-key")
                 )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
@@ -420,6 +360,7 @@ public class HomeControllerTest {
                                 .param("amount", "100.00")
                                 .param("currency", "RUB")
                                 .param("action", "withdraw")
+                                .param("idempotencyKey", "test-idempotency-key")
                 )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
@@ -445,6 +386,7 @@ public class HomeControllerTest {
                                 .param("amount", "-100.00")
                                 .param("currency", "RUB")
                                 .param("action", "deposit")
+                                .param("idempotencyKey", "test-idempotency-key")
                 )
                 .andExpect(status().isOk())
                 .andExpect(view().name("index"))
@@ -499,6 +441,8 @@ public class HomeControllerTest {
                                 .param("recipientLogin", "alex")
                                 .param("amount", "100.00")
                                 .param("currency", "RUB")
+                                .param("idempotencyKey", "test-idempotency-key")
+                                .param("sourceCurrency", "RUB")
                 )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))
@@ -542,6 +486,8 @@ public class HomeControllerTest {
                                 .param("recipientLogin", "alex")
                                 .param("amount", "100.00")
                                 .param("currency", "RUB")
+                                .param("idempotencyKey", "test-idempotency-key")
+                                .param("sourceCurrency", "RUB")
                 )
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/"))

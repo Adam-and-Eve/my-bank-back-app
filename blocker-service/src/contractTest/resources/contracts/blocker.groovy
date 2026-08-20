@@ -14,7 +14,7 @@ import org.springframework.cloud.contract.spec.Contract
                 body(
                         operationId  : "op-1",
                         operationType: "DEPOSIT",
-                        login        : "ivan",
+                        login        : "alexey",
                         amount       : "1000.00",
                         currency     : "RUB",
                         normalizedAmount: "1000.00",
@@ -43,8 +43,8 @@ import org.springframework.cloud.contract.spec.Contract
                 body(
                         operationId  : "op-2",
                         operationType: "TRANSFER",
-                        sender       : "ivan",
-                        recipient    : "olga",
+                        sender       : "alexey",
+                        recipient    : "dmitry",
                         amount       : "100000.01",
                         currency     : "USD",
                         normalizedAmount: "9000000.90",
