@@ -19,7 +19,8 @@
       { "name": "TRANSFER_WRITE", "description": "Permission to perform transfer" },
       { "name": "SERVICE", "description": "Generic service role for microservices" },
       { "name": "ACCOUNT_INTERNAL", "description": "Permission to call internal account API" },
-      { "name": "NOTIFICATION_WRITE", "description": "Permission to create notification" }
+      { "name": "NOTIFICATION_WRITE", "description": "Permission to create notification" },
+      { "name": "EXCHANGE_GENERATOR", "description": "Permission to update exchange rates" }
     ]
   },
   "clients": [
@@ -100,6 +101,16 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true
+    },
+    {
+      "clientId": "exchange-generator-service",
+      "name": "Exchange Generator Service",
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "__EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET__",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
     }
   ],
   "users": [
@@ -159,6 +170,12 @@
       "enabled": true,
       "serviceAccountClientId": "notification-service",
       "realmRoles": ["SERVICE", "NOTIFICATION_WRITE"]
+    },
+    {
+      "username": "service-account-exchange-generator-service",
+      "enabled": true,
+      "serviceAccountClientId": "exchange-generator-service",
+      "realmRoles": ["SERVICE", "EXCHANGE_GENERATOR"]
     }
   ]
 }

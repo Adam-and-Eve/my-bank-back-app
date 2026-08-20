@@ -59,6 +59,21 @@ x-front-ui-service-env: &front-ui-service-env
   BANK_KEYCLOAK_END_SESSION_URI: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout
   API_GATEWAY_URL: http://api-gateway:8080
 
+x-exchange-service-env: &exchange-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+
+x-exchange-generator-service-env: &exchange-generator-service-env
+  <<: *config-client-env
+  EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET: ${EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET:-__EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET__}
+  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+
+x-blocker-service-env: &blocker-service-env
+  <<: *config-client-env
+  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
+  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+
 services:
   postgres:
     image: postgres:18
@@ -164,6 +179,62 @@ services:
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8084'" ]
     networks: [ bank-network ]
 
+  exchange-service:
+    build:
+      context: ./exchange-service
+    image: my-bank-exchange-service:local
+    container_name: exchange-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *exchange-service-env
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8086'" ]
+    networks: [ bank-network ]
+
+  exchange-generator-service:
+    build:
+      context: ./exchange-generator-service
+    image: my-bank-exchange-generator-service:local
+    container_name: exchange-generator-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *exchange-generator-service-env
+    depends_on:
+      exchange-service:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8087'" ]
+    networks: [ bank-network ]
+
+  blocker-service:
+    build:
+      context: ./blocker-service
+    image: my-bank-blocker-service:local
+    container_name: blocker-service
+    profiles:
+      - app
+      - deploy
+    environment:
+      <<: *blocker-service-env
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    healthcheck:
+      <<: *app-health
+      test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8088'" ]
+    networks: [ bank-network ]
+
   cash-service:
     build:
       context: ./cash-service
@@ -176,6 +247,8 @@ services:
       <<: *cash-service-env
     depends_on:
       notification-service:
+        condition: service_healthy
+      blocker-service:
         condition: service_healthy
     healthcheck:
       <<: *app-health
@@ -194,6 +267,10 @@ services:
       <<: *transfer-service-env
     depends_on:
       notification-service:
+        condition: service_healthy
+      exchange-generator-service:
+        condition: service_healthy
+      blocker-service:
         condition: service_healthy
     healthcheck:
       <<: *app-health

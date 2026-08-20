@@ -34,7 +34,7 @@ public class HttpExchangeClient implements ExchangeClient {
     @Autowired
     public HttpExchangeClient(
         RestClient.Builder restClientBuilder,
-        @Value("${bank.services.exchange.base-url}") String exchangeBaseUrl,
+        @Value("${bank.services.exchange-service.base-url}") String exchangeBaseUrl,
         ServiceTokenProvider serviceTokenProvider
     ) {
         this (

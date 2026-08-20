@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: exchange-generator-service
+  security:
+    oauth2:
+      client:
+        registration:
+          exchange-generator-service:
+            provider: keycloak
+            authorization-grant-type: client_credentials
+            client-id: exchange-generator-service
+            client-secret: ${EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET:}
+        provider:
+          keycloak:
+            token-uri: ${BANK_KEYCLOAK_TOKEN_URI:http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/token}
+
+bank:
+  services:
+    notification:
+      base-url: ${BANK_NOTIFICATION_BASE_URL:http://notification-service}
+    exchange-service:
+      base-url: ${BANK_EXCHANGE_SERVICE_BASE_URL:http://exchange-service}
+
+server:
+  port: 8087

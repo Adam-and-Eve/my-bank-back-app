@@ -43,7 +43,7 @@ public class ExchangeRatePublisherServiceImpl implements ExchangeRatePublisherSe
      * </summary>
      **/
     @Override
-    @Scheduled(fixedDelayString = "${bank.exchange-generator-service.fixed-delay-ms:1000}")
+    @Scheduled(fixedDelayString = "${bank.services.exchange-generator-service.fixed-delay-ms:1000}")
     public void publishNextRates() {
         exchangeClient.updateRates(exchangeRateGenerator.nextRates());
     }
