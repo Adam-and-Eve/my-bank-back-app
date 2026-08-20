@@ -128,6 +128,8 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
 
         validateAmount(request.amount());
 
+        validateAmount(request.resolvedRecipientAmount());
+
         var sender = findAccount(request.senderLogin());
 
         var recipient = accountRepository.findByLogin(request.recipientLogin())
@@ -135,7 +137,7 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
 
         withdraw(sender, request.amount());
 
-        recipient.setBalance(recipient.getBalance().add(request.amount()));
+        recipient.setBalance(recipient.getBalance().add(request.resolvedRecipientAmount()));
 
         saveInDeterministicOrder(sender, recipient);
 

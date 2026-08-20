@@ -36,8 +36,9 @@ import static org.mockito.Mockito.*;
 /**
  * <summary>
  * Юнит-тесты и интеграционные тесты механизмов повтора (Retry) для сервиса BalanceOperationServiceImpl.
- * Проверяют корректность пополнения, снятия, переводов, детерминированного сохранения сущностей,
- * валидации сумм и работы аннотации @Retryable при OptimisticLockException.
+ * Проверяют корректность пополнения, снятия, переводов, переводов с конвертацией валют,
+ * детерминированного сохранения сущностей, валидации сумм и работы аннотации @Retryable
+ * при OptimisticLockException.
  * </summary>
  **/
 public class BalanceOperationServiceImplTest {
@@ -79,7 +80,11 @@ public class BalanceOperationServiceImplTest {
          **/
         @Test
         public void shouldDepositBalanceSuccessfully() {
-            var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"));
+            var account = createAccount(
+                    1L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("1000.00")
+            );
 
             var request = new BalanceOperationRequestViewModel(
                     LOGIN_DMITRY,
@@ -88,22 +93,20 @@ public class BalanceOperationServiceImplTest {
                     OPERATION_ID
             );
 
-            when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(account));
 
-            when(accountRepository.save(any(AccountModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            when(accountRepository.save(any(AccountModel.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
 
             var response = balanceOperationService.deposit(request);
 
             assertThat(response).isNotNull();
-
             assertThat(response.login()).isEqualTo(LOGIN_DMITRY);
-
             assertThat(response.balance()).isEqualByComparingTo("1500.00");
-
             assertThat(response.currency()).isEqualTo("RUB");
 
             verify(accountRepository).findByLogin(LOGIN_DMITRY);
-
             verify(accountRepository).save(account);
         }
 
@@ -121,7 +124,8 @@ public class BalanceOperationServiceImplTest {
                     OPERATION_ID
             );
 
-            when(accountRepository.findByLogin(LOGIN_UNKNOWN)).thenReturn(Optional.empty());
+            when(accountRepository.findByLogin(LOGIN_UNKNOWN))
+                    .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> balanceOperationService.deposit(request))
                     .isInstanceOf(AccountNotFoundException.class);
@@ -140,7 +144,11 @@ public class BalanceOperationServiceImplTest {
          **/
         @Test
         public void shouldWithdrawBalanceSuccessfully() {
-            var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"));
+            var account = createAccount(
+                    1L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("1000.00")
+            );
 
             var request = new BalanceOperationRequestViewModel(
                     LOGIN_DMITRY,
@@ -149,14 +157,15 @@ public class BalanceOperationServiceImplTest {
                     OPERATION_ID
             );
 
-            when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(account));
 
-            when(accountRepository.save(any(AccountModel.class))).thenAnswer(invocation -> invocation.getArgument(0));
+            when(accountRepository.save(any(AccountModel.class)))
+                    .thenAnswer(invocation -> invocation.getArgument(0));
 
             var response = balanceOperationService.withdraw(request);
 
             assertThat(response).isNotNull();
-
             assertThat(response.balance()).isEqualByComparingTo("600.00");
 
             verify(accountRepository).save(account);
@@ -169,7 +178,11 @@ public class BalanceOperationServiceImplTest {
          **/
         @Test
         public void shouldThrowInsufficientFundsExceptionWhenBalanceIsInsufficient() {
-            var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("100.00"));
+            var account = createAccount(
+                    1L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("100.00")
+            );
 
             var request = new BalanceOperationRequestViewModel(
                     LOGIN_DMITRY,
@@ -178,7 +191,8 @@ public class BalanceOperationServiceImplTest {
                     OPERATION_ID
             );
 
-            when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(account));
 
             assertThatThrownBy(() -> balanceOperationService.withdraw(request))
                     .isInstanceOf(InsufficientFundsException.class);
@@ -188,20 +202,27 @@ public class BalanceOperationServiceImplTest {
 
         // endregion
 
-        // region Tests - Transfer & Deterministic Order
+        // region Tests - Transfer
 
         /**
          * <summary>
-         * Проверяет успешный перевод средств между счетами и детерминированный порядок сохранения
-         * моделей по возрастанию ID для предотвращения взаимных блокировок (Deadlocks).
-         * ID Отправителя (2L) > ID Получателя (1L), поэтому первым должен сохраниться Получатель (1L).
+         * Проверяет успешный перевод средств между счетами без конвертации валюты.
+         * Также проверяет детерминированный порядок сохранения моделей по возрастанию ID.
          * </summary>
          **/
         @Test
-        public void shouldTransferBalanceAndSaveAccountsInDeterministicOrderById() {
-            var sender = createAccount(2L, LOGIN_DMITRY, new BigDecimal("1000.00"));
+        public void shouldTransferBalanceSuccessfully() {
+            var sender = createAccount(
+                    2L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("1000.00")
+            );
 
-            var recipient = createAccount(1L, LOGIN_ALEXEY, new BigDecimal("500.00"));
+            var recipient = createAccount(
+                    1L,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("500.00")
+            );
 
             var request = new TransferBalanceRequestViewModel(
                     LOGIN_DMITRY,
@@ -211,27 +232,136 @@ public class BalanceOperationServiceImplTest {
                     OPERATION_ID
             );
 
-            when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(sender));
 
-            when(accountRepository.findByLogin(LOGIN_ALEXEY)).thenReturn(Optional.of(recipient));
+            when(accountRepository.findByLogin(LOGIN_ALEXEY))
+                    .thenReturn(Optional.of(recipient));
+
+            var response = balanceOperationService.transfer(request);
+
+            assertThat(response).isNotNull();
+            assertThat(response.senderLogin()).isEqualTo(LOGIN_DMITRY);
+            assertThat(response.recipientLogin()).isEqualTo(LOGIN_ALEXEY);
+            assertThat(response.senderBalance()).isEqualByComparingTo("700.00");
+
+            assertThat(sender.getBalance())
+                    .isEqualByComparingTo("700.00");
+
+            assertThat(recipient.getBalance())
+                    .isEqualByComparingTo("800.00");
+
+            InOrder inOrder = Mockito.inOrder(accountRepository);
+
+            inOrder.verify(accountRepository).save(recipient);
+            inOrder.verify(accountRepository).save(sender);
+        }
+
+        /**
+         * <summary>
+         * Проверяет перевод с конвертацией валюты, при котором с отправителя
+         * списывается исходная сумма, а получателю зачисляется рассчитанная сумма
+         * в другой валюте.
+         * </summary>
+         **/
+        @Test
+        public void shouldTransferBalanceWithCurrencyConversion() {
+            var sender = createAccount(
+                    2L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("1000.00")
+            );
+
+            var recipient = createAccount(
+                    1L,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("500.00")
+            );
+
+            var request = new TransferBalanceRequestViewModel(
+                    LOGIN_DMITRY,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("100.00"),
+                    CurrencyEnumModel.RUB,
+                    new BigDecimal("1.10"),
+                    CurrencyEnumModel.USD,
+                    OPERATION_ID
+            );
+
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(sender));
+
+            when(accountRepository.findByLogin(LOGIN_ALEXEY))
+                    .thenReturn(Optional.of(recipient));
 
             var response = balanceOperationService.transfer(request);
 
             assertThat(response).isNotNull();
 
-            assertThat(response.senderLogin()).isEqualTo(LOGIN_DMITRY);
+            assertThat(response.senderLogin())
+                    .isEqualTo(LOGIN_DMITRY);
 
-            assertThat(response.recipientLogin()).isEqualTo(LOGIN_ALEXEY);
+            assertThat(response.recipientLogin())
+                    .isEqualTo(LOGIN_ALEXEY);
 
-            assertThat(response.senderBalance()).isEqualByComparingTo("700.00");
+            assertThat(response.senderBalance())
+                    .isEqualByComparingTo("900.00");
 
-            assertThat(recipient.getBalance()).isEqualByComparingTo("800.00");
+            assertThat(sender.getBalance())
+                    .isEqualByComparingTo("900.00");
+
+            assertThat(recipient.getBalance())
+                    .isEqualByComparingTo("501.10");
 
             InOrder inOrder = Mockito.inOrder(accountRepository);
 
             inOrder.verify(accountRepository).save(recipient);
-
             inOrder.verify(accountRepository).save(sender);
+        }
+
+        /**
+         * <summary>
+         * Проверяет использование исходной суммы и валюты в качестве суммы и валюты
+         * получателя, если recipientAmount и recipientCurrency не заданы.
+         * </summary>
+         **/
+        @Test
+        public void shouldUseSourceAmountAndCurrencyWhenRecipientValuesAreNull() {
+            var sender = createAccount(
+                    2L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("1000.00")
+            );
+
+            var recipient = createAccount(
+                    1L,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("500.00")
+            );
+
+            var request = new TransferBalanceRequestViewModel(
+                    LOGIN_DMITRY,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("300.00"),
+                    CurrencyEnumModel.RUB,
+                    null,
+                    null,
+                    OPERATION_ID
+            );
+
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(sender));
+
+            when(accountRepository.findByLogin(LOGIN_ALEXEY))
+                    .thenReturn(Optional.of(recipient));
+
+            balanceOperationService.transfer(request);
+
+            assertThat(sender.getBalance())
+                    .isEqualByComparingTo("700.00");
+
+            assertThat(recipient.getBalance())
+                    .isEqualByComparingTo("800.00");
         }
 
         /**
@@ -262,7 +392,11 @@ public class BalanceOperationServiceImplTest {
          **/
         @Test
         public void shouldThrowRecipientNotFoundExceptionWhenRecipientDoesNotExist() {
-            var sender = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"));
+            var sender = createAccount(
+                    1L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("1000.00")
+            );
 
             var request = new TransferBalanceRequestViewModel(
                     LOGIN_DMITRY,
@@ -272,12 +406,60 @@ public class BalanceOperationServiceImplTest {
                     OPERATION_ID
             );
 
-            when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(sender));
 
-            when(accountRepository.findByLogin(LOGIN_UNKNOWN)).thenReturn(Optional.empty());
+            when(accountRepository.findByLogin(LOGIN_UNKNOWN))
+                    .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> balanceOperationService.transfer(request))
                     .isInstanceOf(RecipientNotFoundException.class);
+
+            verify(accountRepository, never()).save(any());
+        }
+
+        /**
+         * <summary>
+         * Проверяет, что при недостаточном балансе отправителя получатель
+         * не изменяется и ни один аккаунт не сохраняется.
+         * </summary>
+         **/
+        @Test
+        public void shouldThrowInsufficientFundsExceptionWhenTransferAmountExceedsSenderBalance() {
+            var sender = createAccount(
+                    2L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("100.00")
+            );
+
+            var recipient = createAccount(
+                    1L,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("500.00")
+            );
+
+            var request = new TransferBalanceRequestViewModel(
+                    LOGIN_DMITRY,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("150.00"),
+                    CurrencyEnumModel.RUB,
+                    OPERATION_ID
+            );
+
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(sender));
+
+            when(accountRepository.findByLogin(LOGIN_ALEXEY))
+                    .thenReturn(Optional.of(recipient));
+
+            assertThatThrownBy(() -> balanceOperationService.transfer(request))
+                    .isInstanceOf(InsufficientFundsException.class);
+
+            assertThat(sender.getBalance())
+                    .isEqualByComparingTo("100.00");
+
+            assertThat(recipient.getBalance())
+                    .isEqualByComparingTo("500.00");
 
             verify(accountRepository, never()).save(any());
         }
@@ -299,6 +481,7 @@ public class BalanceOperationServiceImplTest {
                     CurrencyEnumModel.RUB,
                     OPERATION_ID
             );
+
             var negativeRequest = new BalanceOperationRequestViewModel(
                     LOGIN_DMITRY,
                     new BigDecimal("-10.00"),
@@ -310,6 +493,24 @@ public class BalanceOperationServiceImplTest {
                     .isInstanceOf(InvalidAmountException.class);
 
             assertThatThrownBy(() -> balanceOperationService.deposit(negativeRequest))
+                    .isInstanceOf(InvalidAmountException.class);
+        }
+
+        /**
+         * <summary>
+         * Проверяет выброс InvalidAmountException при передаче null вместо суммы.
+         * </summary>
+         **/
+        @Test
+        public void shouldThrowInvalidAmountExceptionWhenAmountIsNull() {
+            var request = new BalanceOperationRequestViewModel(
+                    LOGIN_DMITRY,
+                    null,
+                    CurrencyEnumModel.RUB,
+                    OPERATION_ID
+            );
+
+            assertThatThrownBy(() -> balanceOperationService.deposit(request))
                     .isInstanceOf(InvalidAmountException.class);
         }
 
@@ -329,6 +530,95 @@ public class BalanceOperationServiceImplTest {
 
             assertThatThrownBy(() -> balanceOperationService.deposit(invalidScaleRequest))
                     .isInstanceOf(InvalidAmountScaleException.class);
+        }
+
+        /**
+         * <summary>
+         * Проверяет валидацию суммы, зачисляемой получателю при переводе.
+         * </summary>
+         **/
+        @Test
+        public void shouldThrowInvalidAmountExceptionWhenRecipientAmountIsInvalid() {
+            var request = new TransferBalanceRequestViewModel(
+                    LOGIN_DMITRY,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("100.00"),
+                    CurrencyEnumModel.RUB,
+                    BigDecimal.ZERO,
+                    CurrencyEnumModel.USD,
+                    OPERATION_ID
+            );
+
+            assertThatThrownBy(() -> balanceOperationService.transfer(request))
+                    .isInstanceOf(InvalidAmountException.class);
+
+            verify(accountRepository, never()).findByLogin(any());
+        }
+
+        /**
+         * <summary>
+         * Проверяет выброс InvalidAmountScaleException, если сумма зачисления
+         * получателю содержит более двух знаков после запятой.
+         * </summary>
+         **/
+        @Test
+        public void shouldThrowInvalidAmountScaleExceptionWhenRecipientAmountScaleExceedsTwo() {
+            var request = new TransferBalanceRequestViewModel(
+                    LOGIN_DMITRY,
+                    LOGIN_ALEXEY,
+                    new BigDecimal("100.00"),
+                    CurrencyEnumModel.RUB,
+                    new BigDecimal("1.555"),
+                    CurrencyEnumModel.USD,
+                    OPERATION_ID
+            );
+
+            assertThatThrownBy(() -> balanceOperationService.transfer(request))
+                    .isInstanceOf(InvalidAmountScaleException.class);
+
+            verify(accountRepository, never()).findByLogin(any());
+        }
+
+        /**
+         * <summary>
+         * Проверяет выброс NullPointerException при передаче null вместо запроса на перевод.
+         * </summary>
+         **/
+        @Test
+        public void shouldThrowExceptionWhenTransferRequestIsNull() {
+            assertThatThrownBy(() -> balanceOperationService.transfer(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("Transfer request must not be null");
+
+            verifyNoInteractions(accountRepository);
+        }
+
+        /**
+         * <summary>
+         * Проверяет выброс NullPointerException при передаче null вместо запроса на пополнение.
+         * </summary>
+         **/
+        @Test
+        public void shouldThrowExceptionWhenDepositRequestIsNull() {
+            assertThatThrownBy(() -> balanceOperationService.deposit(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("Deposit request must not be null");
+
+            verifyNoInteractions(accountRepository);
+        }
+
+        /**
+         * <summary>
+         * Проверяет выброс NullPointerException при передаче null вместо запроса на снятие.
+         * </summary>
+         **/
+        @Test
+        public void shouldThrowExceptionWhenWithdrawRequestIsNull() {
+            assertThatThrownBy(() -> balanceOperationService.withdraw(null))
+                    .isInstanceOf(NullPointerException.class)
+                    .hasMessage("Withdraw request must not be null");
+
+            verifyNoInteractions(accountRepository);
         }
 
         // endregion
@@ -372,7 +662,12 @@ public class BalanceOperationServiceImplTest {
             );
 
             when(accountRepository.findByLogin(LOGIN_DMITRY))
-                    .thenAnswer(invocation -> Optional.of(createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"))));
+                    .thenAnswer(invocation ->
+                            Optional.of(createAccount(
+                                    1L,
+                                    LOGIN_DMITRY,
+                                    new BigDecimal("1000.00")
+                            )));
 
             when(accountRepository.save(any(AccountModel.class)))
                     .thenThrow(new OptimisticLockException("Conflict"))
@@ -382,21 +677,29 @@ public class BalanceOperationServiceImplTest {
 
             assertThat(response).isNotNull();
 
-            assertThat(response.balance()).isEqualByComparingTo("1200.00");
+            assertThat(response.balance())
+                    .isEqualByComparingTo("1200.00");
 
-            verify(accountRepository, times(2)).findByLogin(LOGIN_DMITRY);
+            verify(accountRepository, times(2))
+                    .findByLogin(LOGIN_DMITRY);
 
-            verify(accountRepository, times(2)).save(any(AccountModel.class));
+            verify(accountRepository, times(2))
+                    .save(any(AccountModel.class));
         }
 
         /**
          * <summary>
-         * Проверяет превышение максимального лимита попыток (3 попытки) при постоянных сбоях оптимистичной блокировки.
+         * Проверяет превышение максимального лимита попыток (3 попытки)
+         * при постоянных сбоях оптимистичной блокировки.
          * </summary>
          **/
         @Test
         public void shouldExhaustRetriesAndThrowExceptionAfterThreeAttempts() {
-            var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"));
+            var account = createAccount(
+                    1L,
+                    LOGIN_DMITRY,
+                    new BigDecimal("1000.00")
+            );
 
             var request = new BalanceOperationRequestViewModel(
                     LOGIN_DMITRY,
@@ -405,15 +708,20 @@ public class BalanceOperationServiceImplTest {
                     OPERATION_ID
             );
 
-            when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
+            when(accountRepository.findByLogin(LOGIN_DMITRY))
+                    .thenReturn(Optional.of(account));
 
             when(accountRepository.save(any(AccountModel.class)))
-                    .thenThrow(new ObjectOptimisticLockingFailureException(AccountModel.class, 1L));
+                    .thenThrow(new ObjectOptimisticLockingFailureException(
+                            AccountModel.class,
+                            1L
+                    ));
 
             assertThatThrownBy(() -> balanceOperationService.deposit(request))
                     .isInstanceOf(ObjectOptimisticLockingFailureException.class);
 
-            verify(accountRepository, times(3)).save(account);
+            verify(accountRepository, times(3))
+                    .save(account);
         }
     }
 
@@ -421,7 +729,11 @@ public class BalanceOperationServiceImplTest {
 
     // region Helper Methods
 
-    private static AccountModel createAccount(Long id, String login, BigDecimal balance) {
+    private static AccountModel createAccount(
+            Long id,
+            String login,
+            BigDecimal balance
+    ) {
         var account = new AccountModel(
                 login,
                 "Тестовый Пользователь",
