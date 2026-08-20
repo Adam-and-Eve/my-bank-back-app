@@ -21,9 +21,13 @@ spring:
 
 bank:
   services:
-    account:
+    account-service:
       base-url: http://account-service
-    notification:
+    blocker-service:
+      base-url: http://blocker-service
+    exchange-service:
+      base-url: http://exchange-service
+    notification-service:
       base-url: http://notification-service
 
 eureka:

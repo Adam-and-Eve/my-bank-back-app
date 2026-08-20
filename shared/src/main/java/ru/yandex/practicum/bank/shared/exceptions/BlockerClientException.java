@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.cash.exceptions;
+package ru.yandex.practicum.bank.shared.exceptions;
 
 /**
  * <summary>

@@ -22,10 +22,12 @@ bank:
   services:
     account-service:
       base-url: ${BANK_ACCOUNT_SERVICE_BASE_URL:http://account-service}
-    notification-service:
-      base-url: ${BANK_NOTIFICATION_SERVICE_BASE_URL:http://notification-service}
     blocker-service:
       base-url: ${BANK_BLOCKER_SERVICE_BASE_URL:http://blocker-service}
+    exchange-service:
+      base-url: ${BANK_ECXHANGE_SERVICE_BASE_URL:http://exchange-service}
+    notification-service:
+      base-url: ${BANK_NOTIFICATION_SERVICE_BASE_URL:http://notification-service}
 
 server:
   port: 8082

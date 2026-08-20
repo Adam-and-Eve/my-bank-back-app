@@ -23,10 +23,12 @@ bank:
   services:
     account-service:
       base-url: http://account-service
-    notification-service:
-      base-url: http://notification-service
     blocker-service:
       base-url: http://blocker-service
+    exchange-service:
+      base-url: http://exchange-service
+    notification-service:
+      base-url: http://notification-service
 
 eureka:
   client:

@@ -7,7 +7,7 @@ import ru.yandex.practicum.bank.shared.viewmodels.ExchangeRatesUpdateRequestView
  * Контракт HTTP-клиента для взаимодействия с сервисом курсов валют (Exchange Service).
  * </summary>
  **/
-public interface ExchangeClient {
+public interface InternalExchangeClient {
 
     // region Methods
 

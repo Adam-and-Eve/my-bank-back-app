@@ -5,12 +5,14 @@ import ru.yandex.practicum.bank.cash.exceptions.InvalidAmountException;
 import ru.yandex.practicum.bank.cash.exceptions.InvalidAmountScaleException;
 import ru.yandex.practicum.bank.cash.exceptions.OperationBlockedException;
 import ru.yandex.practicum.bank.cash.interfaces.AccountClient;
-import ru.yandex.practicum.bank.cash.interfaces.BlockerClient;
+import ru.yandex.practicum.bank.shared.interfaces.BlockerClient;
 import ru.yandex.practicum.bank.cash.interfaces.CashService;
+import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
 import ru.yandex.practicum.bank.shared.interfaces.NotificationClient;
 import ru.yandex.practicum.bank.cash.mappers.AccountBalanceMapper;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.shared.models.OperationTypeEnumModel;
 import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
@@ -33,6 +35,7 @@ public class CashServiceImpl implements CashService {
 
     private final AccountClient accountClient;
     private final BlockerClient blockerClient;
+    private final ExchangeClient exchangeClient;
     private final NotificationClient notificationClient;
     private final AccountBalanceMapper accountBalanceMapper;
 
@@ -42,10 +45,12 @@ public class CashServiceImpl implements CashService {
 
     public CashServiceImpl(AccountClient accountClient,
                        BlockerClient blockerClient,
+                       ExchangeClient exchangeClient,
                        NotificationClient notificationClient,
                        AccountBalanceMapper accountBalanceMapper) {
         this.accountClient = accountClient;
         this.blockerClient = blockerClient;
+        this.exchangeClient = exchangeClient;
         this.notificationClient = notificationClient;
         this.accountBalanceMapper = accountBalanceMapper;
     }
@@ -113,7 +118,9 @@ public class CashServiceImpl implements CashService {
                 operationId
         ));
 
-        return new CashOperationResponseViewModel(balance.balance(), balance.currency(), "Деньги сняты со счёта");
+        return new CashOperationResponseViewModel(
+                balance.balance(),
+                balance.currency(), "Деньги сняты со счёта");
     }
 
     /**
@@ -150,6 +157,8 @@ public class CashServiceImpl implements CashService {
             String operationId,
             OperationTypeEnumModel operationType
     ) {
+        var normalizedAmount = normalizeForBlocker(request);
+
         var response = blockerClient.check(new OperationCheckRequestViewModel(
                 operationId,
                 operationType,
@@ -157,12 +166,27 @@ public class CashServiceImpl implements CashService {
                 null,
                 null,
                 request.amount(),
-                request.currency()
+                request.currency(),
+                normalizedAmount,
+                CurrencyEnumModel.RUB
         ));
 
         if (!response.allowed()) {
             throw new OperationBlockedException(response.reason());
         }
+    }
+
+    private BigDecimal normalizeForBlocker(CashOperationRequestViewModel request) {
+        if (request.currency() == CurrencyEnumModel.RUB) {
+            return request.amount();
+        }
+
+        var conversion = exchangeClient.convert(
+                request.currency(),
+                CurrencyEnumModel.RUB,
+                request.amount());
+
+        return conversion.targetAmount();
     }
 
     // endregion

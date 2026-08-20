@@ -1,13 +1,12 @@
-package ru.yandex.practicum.bank.cash.clients;
+package ru.yandex.practicum.bank.shared.clients;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
-import ru.yandex.practicum.bank.cash.exceptions.BlockerClientException;
-import ru.yandex.practicum.bank.cash.interfaces.BlockerClient;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.exceptions.BlockerClientException;
+import ru.yandex.practicum.bank.shared.interfaces.BlockerClient;
 import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckResponseViewModel;

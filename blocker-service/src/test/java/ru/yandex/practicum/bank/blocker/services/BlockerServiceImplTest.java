@@ -30,10 +30,12 @@ public class BlockerServiceImplTest {
 
     /**
      * <summary>
-     * Максимальная сумма операции, используемая в тестах.
+     * Максимальная сумма нормализованной операции,
+     * используемая в тестах.
      * </summary>
      */
-    private static final BigDecimal MAX_AMOUNT = new BigDecimal("100000.00");
+    private static final BigDecimal MAX_AMOUNT =
+            new BigDecimal("100000.00");
 
     /**
      * <summary>
@@ -42,6 +44,14 @@ public class BlockerServiceImplTest {
      */
     private static final String AMOUNT_LIMIT_MESSAGE =
             "Operation amount exceeds blocker limit";
+
+    /**
+     * <summary>
+     * Сообщение об ошибке при отсутствии базовой валюты RUB.
+     * </summary>
+     */
+    private static final String BASE_CURRENCY_MESSAGE =
+            "baseCurrency must be RUB";
 
     // endregion
 
@@ -60,8 +70,8 @@ public class BlockerServiceImplTest {
 
     /**
      * <summary>
-     * Создает сервис блокировки с фиксированным лимитом максимальной суммы
-     * перед выполнением каждого теста.
+     * Создает сервис блокировки с фиксированным лимитом максимальной
+     * нормализованной суммы перед выполнением каждого теста.
      * </summary>
      */
     @BeforeEach
@@ -79,7 +89,7 @@ public class BlockerServiceImplTest {
      * <summary>
      * Проверяет успешное разрешение операции пополнения счета,
      * если логин указан, базовая валюта равна RUB,
-     * а сумма не превышает установленный лимит.
+     * а нормализованная сумма не превышает установленный лимит.
      * </summary>
      */
     @Test
@@ -89,6 +99,8 @@ public class BlockerServiceImplTest {
                 "user",
                 null,
                 null,
+                "50000.00",
+                CurrencyEnumModel.RUB,
                 "50000.00",
                 CurrencyEnumModel.RUB
         );
@@ -102,7 +114,7 @@ public class BlockerServiceImplTest {
      * <summary>
      * Проверяет успешное разрешение операции снятия денежных средств,
      * если логин указан, базовая валюта равна RUB,
-     * а сумма не превышает установленный лимит.
+     * а нормализованная сумма не превышает установленный лимит.
      * </summary>
      */
     @Test
@@ -112,6 +124,8 @@ public class BlockerServiceImplTest {
                 "user",
                 null,
                 null,
+                "50000.00",
+                CurrencyEnumModel.RUB,
                 "50000.00",
                 CurrencyEnumModel.RUB
         );
@@ -125,7 +139,7 @@ public class BlockerServiceImplTest {
      * <summary>
      * Проверяет успешное разрешение операции перевода,
      * если отправитель и получатель указаны, базовая валюта равна RUB,
-     * а сумма не превышает установленный лимит.
+     * а нормализованная сумма не превышает установленный лимит.
      * </summary>
      */
     @Test
@@ -135,6 +149,8 @@ public class BlockerServiceImplTest {
                 null,
                 "sender",
                 "recipient",
+                "50000.00",
+                CurrencyEnumModel.RUB,
                 "50000.00",
                 CurrencyEnumModel.RUB
         );
@@ -146,17 +162,19 @@ public class BlockerServiceImplTest {
 
     /**
      * <summary>
-     * Проверяет, что операция с суммой, равной максимальному лимиту,
-     * разрешается.
+     * Проверяет, что операция с нормализованной суммой,
+     * равной максимальному лимиту, разрешается.
      * </summary>
      */
     @Test
-    void checkShouldAllowOperationWhenAmountEqualsMaxAmount() {
+    void checkShouldAllowOperationWhenNormalizedAmountEqualsMaxAmount() {
         var request = createRequest(
                 OperationTypeEnumModel.DEPOSIT,
                 "user",
                 null,
                 null,
+                "100000.00",
+                CurrencyEnumModel.RUB,
                 "100000.00",
                 CurrencyEnumModel.RUB
         );
@@ -166,9 +184,53 @@ public class BlockerServiceImplTest {
         assertAllowed(result);
     }
 
-    // endregion
+    /**
+     * <summary>
+     * Проверяет успешное разрешение операции в иностранной валюте,
+     * если ее нормализованная сумма в RUB не превышает лимит.
+     * </summary>
+     */
+    @Test
+    void checkShouldAllowOperationWhenNormalizedForeignCurrencyAmountIsWithinLimit() {
+        var request = createRequest(
+                OperationTypeEnumModel.DEPOSIT,
+                "user",
+                null,
+                null,
+                "1000.00",
+                CurrencyEnumModel.USD,
+                "92000.00",
+                CurrencyEnumModel.RUB
+        );
 
-    // region Amount validation
+        var result = blockerService.check(request);
+
+        assertAllowed(result);
+    }
+
+    /**
+     * <summary>
+     * Проверяет, что лимит определяется по нормализованной сумме,
+     * а не по исходной сумме операции.
+     * </summary>
+     */
+    @Test
+    void checkShouldAllowOperationWhenOriginalAmountIsLargeButNormalizedAmountIsWithinLimit() {
+        var request = createRequest(
+                OperationTypeEnumModel.DEPOSIT,
+                "user",
+                null,
+                null,
+                "1000000.00",
+                CurrencyEnumModel.USD,
+                "92000.00",
+                CurrencyEnumModel.RUB
+        );
+
+        var result = blockerService.check(request);
+
+        assertAllowed(result);
+    }
 
     /**
      * <summary>
@@ -177,12 +239,14 @@ public class BlockerServiceImplTest {
      * </summary>
      */
     @Test
-    void checkShouldBlockOperationWhenAmountExceedsMaxAmount() {
+    void checkShouldBlockOperationWhenNormalizedAmountExceedsMaxAmount() {
         var request = createRequest(
                 OperationTypeEnumModel.DEPOSIT,
                 "user",
                 null,
                 null,
+                "1000.00",
+                CurrencyEnumModel.USD,
                 "100000.01",
                 CurrencyEnumModel.RUB
         );
@@ -191,6 +255,62 @@ public class BlockerServiceImplTest {
 
         assertFalse(result.allowed());
         assertEquals(AMOUNT_LIMIT_MESSAGE, result.reason());
+    }
+
+    /**
+     * <summary>
+     * Проверяет, что операция блокируется по нормализованной сумме,
+     * даже если исходная сумма не превышает лимит.
+     * </summary>
+     */
+    @Test
+    void checkShouldBlockOperationWhenNormalizedAmountExceedsLimitButOriginalAmountDoesNot() {
+        var request = createRequest(
+                OperationTypeEnumModel.DEPOSIT,
+                "user",
+                null,
+                null,
+                "90000.00",
+                CurrencyEnumModel.USD,
+                "110000.00",
+                CurrencyEnumModel.RUB
+        );
+
+        var result = blockerService.check(request);
+
+        assertFalse(result.allowed());
+        assertEquals(AMOUNT_LIMIT_MESSAGE, result.reason());
+    }
+
+    // endregion
+
+    // region Base currency validation
+
+    /**
+     * <summary>
+     * Проверяет отклонение операции, если базовая валюта
+     * отличается от RUB.
+     * </summary>
+     */
+    @Test
+    void checkShouldRejectOperationWhenBaseCurrencyIsNotRub() {
+        var request = createRequest(
+                OperationTypeEnumModel.DEPOSIT,
+                "user",
+                null,
+                null,
+                "50000.00",
+                CurrencyEnumModel.USD,
+                "46000.00",
+                CurrencyEnumModel.USD
+        );
+
+        var exception = assertThrows(
+                InvalidOperationRequestException.class,
+                () -> blockerService.check(request)
+        );
+
+        assertEquals(BASE_CURRENCY_MESSAGE, exception.getMessage());
     }
 
     // endregion
@@ -210,6 +330,8 @@ public class BlockerServiceImplTest {
                 null,
                 null,
                 null,
+                "50000.00",
+                CurrencyEnumModel.RUB,
                 "50000.00",
                 CurrencyEnumModel.RUB
         );
@@ -239,6 +361,8 @@ public class BlockerServiceImplTest {
                 null,
                 null,
                 "50000.00",
+                CurrencyEnumModel.RUB,
+                "50000.00",
                 CurrencyEnumModel.RUB
         );
 
@@ -266,6 +390,8 @@ public class BlockerServiceImplTest {
                 null,
                 null,
                 "recipient",
+                "50000.00",
+                CurrencyEnumModel.RUB,
                 "50000.00",
                 CurrencyEnumModel.RUB
         );
@@ -295,6 +421,8 @@ public class BlockerServiceImplTest {
                 "sender",
                 null,
                 "50000.00",
+                CurrencyEnumModel.RUB,
+                "50000.00",
                 CurrencyEnumModel.RUB
         );
 
@@ -321,6 +449,8 @@ public class BlockerServiceImplTest {
                 "   ",
                 null,
                 null,
+                "50000.00",
+                CurrencyEnumModel.RUB,
                 "50000.00",
                 CurrencyEnumModel.RUB
         );
@@ -349,6 +479,8 @@ public class BlockerServiceImplTest {
                 "   ",
                 "recipient",
                 "50000.00",
+                CurrencyEnumModel.RUB,
+                "50000.00",
                 CurrencyEnumModel.RUB
         );
 
@@ -376,6 +508,8 @@ public class BlockerServiceImplTest {
                 "sender",
                 "   ",
                 "50000.00",
+                CurrencyEnumModel.RUB,
+                "50000.00",
                 CurrencyEnumModel.RUB
         );
 
@@ -392,79 +526,21 @@ public class BlockerServiceImplTest {
 
     // endregion
 
-    // region Base currency validation
-
-    /**
-     * <summary>
-     * Проверяет, что операция с базовой валютой, отличной от RUB,
-     * отклоняется с исключением InvalidOperationRequestException.
-     * </summary>
-     */
-    @Test
-    void checkShouldRejectNonRubBaseCurrency() {
-        var request = createRequest(
-                OperationTypeEnumModel.DEPOSIT,
-                "user",
-                null,
-                null,
-                "50000.00",
-                CurrencyEnumModel.USD
-        );
-
-        var exception = assertThrows(
-                InvalidOperationRequestException.class,
-                () -> blockerService.check(request)
-        );
-
-        assertEquals(
-                "baseCurrency must be RUB",
-                exception.getMessage()
-        );
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что проверка базовой валюты выполняется
-     * после проверки обязательных участников операции.
-     * </summary>
-     */
-    @Test
-    void checkShouldValidateParticipantsBeforeBaseCurrency() {
-        var request = createRequest(
-                OperationTypeEnumModel.DEPOSIT,
-                null,
-                null,
-                null,
-                "50000.00",
-                CurrencyEnumModel.USD
-        );
-
-        var exception = assertThrows(
-                InvalidOperationRequestException.class,
-                () -> blockerService.check(request)
-        );
-
-        assertEquals(
-                "login is required for cash operation",
-                exception.getMessage()
-        );
-    }
-
-    // endregion
-
     // region Helpers
 
     /**
      * <summary>
-     * Создает корректный запрос на проверку банковской операции
+     * Создает запрос на проверку банковской операции
      * с указанными параметрами.
      * </summary>
      * @param operationType Тип банковской операции.
      * @param login Логин пользователя.
      * @param sender Отправитель денежных средств.
      * @param recipient Получатель денежных средств.
-     * @param normalizedAmount Нормализованная сумма операции.
-     * @param baseCurrency Базовая валюта операции.
+     * @param amount Сумма операции в исходной валюте.
+     * @param currency Валюта исходной операции.
+     * @param normalizedAmount Сумма операции, нормализованная в базовую валюту.
+     * @param baseCurrency Базовая валюта нормализованной суммы.
      * @return Модель запроса на проверку операции.
      */
     private OperationCheckRequestViewModel createRequest(
@@ -472,6 +548,8 @@ public class BlockerServiceImplTest {
             String login,
             String sender,
             String recipient,
+            String amount,
+            CurrencyEnumModel currency,
             String normalizedAmount,
             CurrencyEnumModel baseCurrency) {
 
@@ -481,8 +559,8 @@ public class BlockerServiceImplTest {
                 login,
                 sender,
                 recipient,
-                new BigDecimal(normalizedAmount),
-                CurrencyEnumModel.RUB,
+                new BigDecimal(amount),
+                currency,
                 new BigDecimal(normalizedAmount),
                 baseCurrency
         );

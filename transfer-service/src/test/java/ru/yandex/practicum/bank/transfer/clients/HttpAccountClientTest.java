@@ -26,8 +26,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -48,8 +47,12 @@ public class HttpAccountClientTest {
     // region Constants
 
     private static final String BASE_URL = "http://account-service";
-    private static final String TRANSFER_URI = BASE_URL + "/api/account/internal/balance/transfer";
-    private static final String TEST_TOKEN = "secret-service-jwt-token";
+
+    private static final String TRANSFER_URI =
+            BASE_URL + "/api/account/internal/balance/transfer";
+
+    private static final String TEST_TOKEN =
+            "secret-service-jwt-token";
 
     // endregion
 
@@ -75,15 +78,14 @@ public class HttpAccountClientTest {
     public void setUp() {
         var restClientBuilder = RestClient.builder();
 
-        mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+        mockServer = MockRestServiceServer
+                .bindTo(restClientBuilder)
+                .build();
 
         objectMapper = new ObjectMapper();
 
-        var circuitBreaker = SimpleCircuitBreaker.withDefaults("accountService");
-
-        lenient().when(accountTransferMapper.toAccountRequest(any())).thenReturn(
-                new AccountTransferRequestViewModel("dmitry", "alexey", new BigDecimal("500.00"), CurrencyEnumModel.RUB, "op-123")
-        );
+        var circuitBreaker =
+                SimpleCircuitBreaker.withDefaults("accountService");
 
         accountClient = new HttpAccountClient(
                 restClientBuilder,
@@ -101,12 +103,36 @@ public class HttpAccountClientTest {
 
     /**
      * <summary>
-     * Проверяет успешную отправку POST-запроса с Bearer-токеном и корректный маппинг ответа от сервиса счетов.
+     * Проверяет успешное выполнение перевода через сервис счетов.
+     * Проверяет передачу Bearer-токена, преобразование операции в запрос
+     * и корректное преобразование ответа сервиса счетов в TransferResultViewModel.
      * </summary>
      **/
     @Test
     public void shouldExecuteTransferSuccessfully() {
-        when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var operation = new TransferOperationViewModel(
+                "dmitry",
+                "alexey",
+                new BigDecimal("500.00"),
+                CurrencyEnumModel.RUB,
+                "op-123"
+        );
+
+        var accountRequest = new AccountTransferRequestViewModel(
+                "dmitry",
+                "alexey",
+                new BigDecimal("500.00"),
+                CurrencyEnumModel.RUB,
+                new BigDecimal("500.00"),
+                CurrencyEnumModel.RUB,
+                "op-123"
+        );
+
+        when(accountTransferMapper.toAccountRequest(operation))
+                .thenReturn(accountRequest);
 
         String jsonResponse = """
                 {
@@ -119,34 +145,116 @@ public class HttpAccountClientTest {
 
         mockServer.expect(requestTo(TRANSFER_URI))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + TEST_TOKEN))
-                .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
-
-        var operation = new TransferOperationViewModel("dmitry", "alexey", new BigDecimal("500.00"), CurrencyEnumModel.RUB, "op-123");
+                .andExpect(header(
+                        HttpHeaders.AUTHORIZATION,
+                        "Bearer " + TEST_TOKEN
+                ))
+                .andRespond(withSuccess(
+                        jsonResponse,
+                        MediaType.APPLICATION_JSON
+                ));
 
         var result = accountClient.execute(operation);
 
         mockServer.verify();
 
+        verify(accountTransferMapper).toAccountRequest(operation);
+
         assertThat(result).isNotNull();
-
-        assertThat(result.senderLogin()).isEqualTo("dmitry");
-
-        assertThat(result.recipientLogin()).isEqualTo("alexey");
-
-        assertThat(result.senderBalance()).isEqualTo(new BigDecimal("1500.00"));
-
-        assertThat(result.currency()).isEqualTo("RUB");
+        assertThat(result.senderLogin())
+                .isEqualTo("dmitry");
+        assertThat(result.recipientLogin())
+                .isEqualTo("alexey");
+        assertThat(result.senderBalance())
+                .isEqualByComparingTo("1500.00");
+        assertThat(result.currency())
+                .isEqualTo("RUB");
     }
 
     /**
      * <summary>
-     * Проверяет парсинг кастомного сообщения об ошибке из JSON-тела ответа сервиса счетов при статусе 400 Bad Request.
+     * Проверяет передачу в сервис счетов сконвертированной суммы получателя
+     * и целевой валюты через AccountTransferMapper.
+     * </summary>
+     **/
+    @Test
+    public void shouldMapConvertedTransferOperationToAccountRequest() {
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var operation = new TransferOperationViewModel(
+                "dmitry",
+                "alexey",
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.USD,
+                new BigDecimal("9200.00"),
+                CurrencyEnumModel.RUB,
+                "op-123"
+        );
+
+        var accountRequest = new AccountTransferRequestViewModel(
+                "dmitry",
+                "alexey",
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.USD,
+                new BigDecimal("9200.00"),
+                CurrencyEnumModel.RUB,
+                "op-123"
+        );
+
+        when(accountTransferMapper.toAccountRequest(operation))
+                .thenReturn(accountRequest);
+
+        String jsonResponse = """
+                {
+                    "senderLogin": "dmitry",
+                    "recipientLogin": "alexey",
+                    "senderBalance": "900.00",
+                    "currency": "USD"
+                }
+                """;
+
+        mockServer.expect(requestTo(TRANSFER_URI))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess(
+                        jsonResponse,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        var result = accountClient.execute(operation);
+
+        mockServer.verify();
+
+        verify(accountTransferMapper)
+                .toAccountRequest(operation);
+
+        assertThat(result.senderLogin())
+                .isEqualTo("dmitry");
+        assertThat(result.recipientLogin())
+                .isEqualTo("alexey");
+        assertThat(result.senderBalance())
+                .isEqualByComparingTo("900.00");
+        assertThat(result.currency())
+                .isEqualTo("USD");
+    }
+
+    /**
+     * <summary>
+     * Проверяет извлечение сообщения об ошибке из JSON-ответа сервиса счетов
+     * при получении HTTP 400 Bad Request.
      * </summary>
      **/
     @Test
     public void shouldExtractErrorMessageFromJsonResponseOnHttpError() {
-        when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var operation = createOperation();
+
+        var accountRequest = createAccountRequest();
+
+        when(accountTransferMapper.toAccountRequest(operation))
+                .thenReturn(accountRequest);
 
         String errorResponseJson = """
                 {
@@ -156,25 +264,33 @@ public class HttpAccountClientTest {
                 """;
 
         mockServer.expect(requestTo(TRANSFER_URI))
+                .andExpect(method(HttpMethod.POST))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST)
                         .body(errorResponseJson)
                         .contentType(MediaType.APPLICATION_JSON));
 
-        var operation = new TransferOperationViewModel("dmitry", "alexey", new BigDecimal("50000.00"), CurrencyEnumModel.RUB, "op-123");
-
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
                 .hasMessage("Недостаточно средств на счете отправителя");
+
+        mockServer.verify();
     }
 
     /**
      * <summary>
-     * Проверяет использование сообщения по умолчанию, если JSON-тело ошибки не содержит текстового поля message.
+     * Проверяет использование сообщения по умолчанию,
+     * если поле message в JSON-ответе об ошибке содержит только пробелы.
      * </summary>
      **/
     @Test
     public void shouldFallbackToDefaultMessageWhenErrorMessageIsBlank() {
-        when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var operation = createOperation();
+
+        when(accountTransferMapper.toAccountRequest(operation))
+                .thenReturn(createAccountRequest());
 
         String errorResponseJson = """
                 {
@@ -188,67 +304,119 @@ public class HttpAccountClientTest {
                         .body(errorResponseJson)
                         .contentType(MediaType.APPLICATION_JSON));
 
-        var operation = new TransferOperationViewModel("dmitry", "alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-123");
-
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
-                .hasMessage("Запрос на обслуживание учетной записи не удался.");
+                .hasMessage(
+                        "Запрос на обслуживание учетной записи не удался."
+                );
+
+        mockServer.verify();
     }
 
     /**
      * <summary>
-     * Проверяет использование сообщения по умолчанию, если сервис счетов вернул невалидный JSON в теле ошибки.
+     * Проверяет использование сообщения по умолчанию,
+     * если сервис счетов возвращает некорректное JSON-тело ошибки.
      * </summary>
      **/
     @Test
     public void shouldFallbackToDefaultMessageWhenResponseBodyIsMalformedJson() {
-        when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var operation = createOperation();
+
+        when(accountTransferMapper.toAccountRequest(operation))
+                .thenReturn(createAccountRequest());
 
         mockServer.expect(requestTo(TRANSFER_URI))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("Internal Server Error (Html or plain text)")
+                        .body("Internal Server Error")
                         .contentType(MediaType.TEXT_PLAIN));
-
-        var operation = new TransferOperationViewModel("dmitry", "alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-123");
 
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
-                .hasMessage("Запрос на обслуживание учетной записи не удался.");
+                .hasMessage(
+                        "Запрос на обслуживание учетной записи не удался."
+                );
+
+        mockServer.verify();
     }
 
     /**
      * <summary>
-     * Проверяет обработку таймаута или сетевого сбоя при выполнении запроса (RestClientException).
+     * Проверяет обработку сетевого сбоя при выполнении HTTP-запроса
+     * и преобразование RestClientException в AccountClientException.
      * </summary>
      **/
     @Test
     public void shouldHandleNetworkFailure() {
-        when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var operation = createOperation();
+
+        when(accountTransferMapper.toAccountRequest(operation))
+                .thenReturn(createAccountRequest());
 
         mockServer.expect(requestTo(TRANSFER_URI))
-                .andRespond(withException(new IOException("Connection refused")));
-
-        var operation = new TransferOperationViewModel("dmitry", "alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-123");
+                .andRespond(withException(
+                        new IOException("Connection refused")
+                ));
 
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
-                .hasMessage("Запрос на обслуживание учетной записи не удался.");
+                .hasMessage(
+                        "Запрос на обслуживание учетной записи не удался."
+                );
+
+        mockServer.verify();
     }
 
     /**
      * <summary>
-     * Проверяет срабатывание резервного метода (fallback) при размыкании цепи Circuit Breaker или непредвиденных исключениях.
+     * Проверяет работу fallback-механизма при возникновении непредвиденного
+     * исключения во время выполнения операции.
      * </summary>
      **/
     @Test
-    public void shouldThrowUnavailableExceptionWhenCircuitBreakerTriggersOnGenericError() {
-        when(serviceTokenProvider.getAccessToken()).thenThrow(new RuntimeException("OAuth2 Identity Provider unavailable"));
+    public void shouldThrowUnavailableExceptionWhenUnexpectedErrorOccurs() {
+        when(serviceTokenProvider.getAccessToken())
+                .thenThrow(new RuntimeException(
+                        "OAuth2 Identity Provider unavailable"
+                ));
 
-        var operation = new TransferOperationViewModel("dmitry", "alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-123");
+        var operation = createOperation();
 
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
                 .hasMessage("Сервис счетов временно недоступен");
+    }
+
+    // endregion
+
+    // region Private Methods
+
+    private TransferOperationViewModel createOperation() {
+        return new TransferOperationViewModel(
+                "dmitry",
+                "alexey",
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.RUB,
+                "op-123"
+        );
+    }
+
+    private AccountTransferRequestViewModel createAccountRequest() {
+        return new AccountTransferRequestViewModel(
+                "dmitry",
+                "alexey",
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.RUB,
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.RUB,
+                "op-123"
+        );
     }
 
     // endregion

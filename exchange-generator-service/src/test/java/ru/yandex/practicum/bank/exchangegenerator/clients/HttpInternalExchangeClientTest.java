@@ -2,6 +2,7 @@ package ru.yandex.practicum.bank.exchangegenerator.clients;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpMethod;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
@@ -26,7 +27,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
  * Unit-тесты HTTP-клиента для взаимодействия с сервисом курсов валют.
  * </summary>
  **/
-public class HttpExchangeClientTest {
+public class HttpInternalExchangeClientTest {
 
     // region Fields
 
@@ -34,68 +35,79 @@ public class HttpExchangeClientTest {
      * <summary>
      * Базовый URL сервиса курсов валют, используемый в тестах.
      * </summary>
-     **/
+     */
     private static final String BASE_URL = "http://exchange-service";
 
     /**
      * <summary>
      * Тестовый токен сервисной аутентификации.
      * </summary>
-     **/
+     */
     private static final String ACCESS_TOKEN = "exchange-generator-service";
 
     /**
      * <summary>
      * Конструктор для создания экземпляра RestClient.
      * </summary>
-     **/
+     */
     private RestClient.Builder restClientBuilder;
 
     /**
      * <summary>
      * Mock-сервер для проверки HTTP-запросов, отправляемых RestClient.
      * </summary>
-     **/
-    private MockRestServiceServer mockServer;
+     */
+     private MockRestServiceServer mockServer;
 
-    /**
+     /**
      * <summary>
      * Mock-провайдер сервисного OAuth2-токена.
      * </summary>
-     **/
-    private ServiceTokenProvider serviceTokenProvider;
+     */
+     private ServiceTokenProvider serviceTokenProvider;
 
-    /**
+     /**
      * <summary>
      * Circuit Breaker, используемый HTTP-клиентом в тестах.
      * </summary>
-     **/
-    private SimpleCircuitBreaker circuitBreaker;
+     */
+     private SimpleCircuitBreaker circuitBreaker;
 
-    /**
+     /**
      * <summary>
      * Тестируемый HTTP-клиент сервиса курсов валют.
      * </summary>
-     **/
-    private HttpExchangeClient exchangeClient;
+     */
+     private HttpInternalExchangeClient exchangeClient;
 
-    // endregion
+     // endregion
 
-    // region Setup
+     // region Setup
 
+     /**
+     * <summary>
+     * Создает тестовый HTTP-клиент с MockRestServiceServer,
+     * тестовым Circuit Breaker и mock-провайдером сервисного токена.
+     * </summary>
+     */
     @BeforeEach
     void setUp() {
         restClientBuilder = RestClient.builder();
 
-        mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+        mockServer = MockRestServiceServer
+                .bindTo(restClientBuilder)
+                .build();
 
         serviceTokenProvider = mock(ServiceTokenProvider.class);
 
-        when(serviceTokenProvider.getAccessToken()).thenReturn(ACCESS_TOKEN);
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(ACCESS_TOKEN);
 
-        circuitBreaker = SimpleCircuitBreaker.withDefaults("exchangeServiceTest");
+        circuitBreaker = SimpleCircuitBreaker.withDefaults(
+                "exchangeServiceTest"
+        );
 
-        exchangeClient = new HttpExchangeClient(
+        exchangeClient = new HttpInternalExchangeClient(
                 restClientBuilder,
                 BASE_URL,
                 circuitBreaker,
@@ -105,21 +117,28 @@ public class HttpExchangeClientTest {
 
     // endregion
 
-    // region Tests
+    // region Successful operations
 
     /**
      * <summary>
      * Проверяет отправку PUT-запроса на обновление курсов валют
-     * с использованием Bearer-токена авторизации.
+     * с использованием Bearer-токена авторизации и корректного тела запроса.
      * </summary>
-     **/
+     */
     @Test
-    void updateRates_shouldSendPutRequestWithBearerToken() {
-        var request = new ExchangeRatesUpdateRequestViewModel(List.of());
+    void updateRatesShouldSendPutRequestWithBearerToken() {
+        var request = new ExchangeRatesUpdateRequestViewModel(
+                List.of()
+        );
 
-        mockServer.expect(requestTo(BASE_URL + "/api/exchange/rates"))
-                .andExpect(method(org.springframework.http.HttpMethod.PUT))
-                .andExpect(header(AUTHORIZATION, "Bearer " + ACCESS_TOKEN))
+        mockServer.expect(
+                        requestTo(BASE_URL + "/api/exchange/rates")
+                )
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(header(
+                        AUTHORIZATION,
+                        "Bearer " + ACCESS_TOKEN
+                ))
                 .andExpect(content().json("""
                         {
                             "rates": []
@@ -127,27 +146,42 @@ public class HttpExchangeClientTest {
                         """))
                 .andRespond(withNoContent());
 
-        assertDoesNotThrow(() -> exchangeClient.updateRates(request));
+        assertDoesNotThrow(
+                () -> exchangeClient.updateRates(request)
+        );
 
         mockServer.verify();
     }
 
+    // endregion
+
+    // region Error handling
+
     /**
      * <summary>
-     * Проверяет обработку ошибки сервиса курсов валют через Circuit Breaker
-     * без выбрасывания исключения наружу.
+     * Проверяет, что ошибка сервиса курсов валют
+     * обрабатывается Circuit Breaker и не выбрасывается наружу.
      * </summary>
-     **/
+     */
     @Test
-    void updateRates_shouldNotThrowWhenExchangeServiceReturnsError() {
-        var request = new ExchangeRatesUpdateRequestViewModel(List.of());
+    void updateRatesShouldNotThrowWhenExchangeServiceReturnsError() {
+        var request = new ExchangeRatesUpdateRequestViewModel(
+                List.of()
+        );
 
-        mockServer.expect(requestTo(BASE_URL + "/api/exchange/rates"))
-                .andExpect(method(org.springframework.http.HttpMethod.PUT))
-                .andExpect(header(AUTHORIZATION, "Bearer " + ACCESS_TOKEN))
+        mockServer.expect(
+                        requestTo(BASE_URL + "/api/exchange/rates")
+                )
+                .andExpect(method(HttpMethod.PUT))
+                .andExpect(header(
+                        AUTHORIZATION,
+                        "Bearer " + ACCESS_TOKEN
+                ))
                 .andRespond(withServerError());
 
-        assertDoesNotThrow(() -> exchangeClient.updateRates(request));
+        assertDoesNotThrow(
+                () -> exchangeClient.updateRates(request)
+        );
 
         mockServer.verify();
     }

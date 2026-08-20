@@ -21,9 +21,11 @@ eureka:
 
 bank:
   services:
+    blocker-service:
+      base-url: http://blocker-service
     exchange-service:
       base-url: http://localhost:8086
-    notification-service:
-      base-url: http://localhost:8084
     exchange-generator-service:
       fixed-delay-ms: 1000
+    notification-service:
+      base-url: http://localhost:8084

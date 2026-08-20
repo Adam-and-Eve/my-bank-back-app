@@ -40,6 +40,13 @@ public record OperationCheckRequestViewModel (
         BigDecimal amount,
 
         @NotNull
-        CurrencyEnumModel currency
+        CurrencyEnumModel currency,
+
+        @NotNull
+        @Positive
+        BigDecimal normalizedAmount,
+
+        @NotNull
+        CurrencyEnumModel baseCurrency
 ) {
 }

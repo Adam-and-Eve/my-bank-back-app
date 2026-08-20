@@ -19,6 +19,8 @@ public record AccountTransferRequestViewModel(
         String recipientLogin,
         BigDecimal amount,
         CurrencyEnumModel currency,
+        BigDecimal recipientAmount,
+        CurrencyEnumModel recipientCurrency,
         String operationId
 ) {
 }

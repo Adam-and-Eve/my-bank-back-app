@@ -54,10 +54,7 @@ public class BlockerServiceImpl implements BlockerService {
         validateBaseCurrency(request);
 
         if (request.normalizedAmount().compareTo(properties.maxAmount()) > 0) {
-            return new OperationCheckResponseViewModel(
-                    false,
-                    "Operation amount exceeds blocker limit"
-            );
+            return new OperationCheckResponseViewModel(false, "Operation amount exceeds blocker limit");
         }
 
         return new OperationCheckResponseViewModel(true, null);
@@ -74,38 +71,19 @@ public class BlockerServiceImpl implements BlockerService {
      */
     private void validateParticipants(OperationCheckRequestViewModel request) {
         if (request.operationType() == OperationTypeEnumModel.TRANSFER) {
-            requireText(
-                    request.sender(),
-                    "sender is required for transfer"
-            );
+            requireText(request.sender(), "sender is required for transfer");
 
-            requireText(
-                    request.recipient(),
-                    "recipient is required for transfer"
-            );
+            requireText(request.recipient(), "recipient is required for transfer");
 
             return;
         }
 
-        requireText(
-                request.login(),
-                "login is required for cash operation"
-        );
+        requireText(request.login(), "login is required for cash operation");
     }
 
-    /**
-     * <summary>
-     * Проверяет, что базовой валютой операции является российский рубль.
-     * </summary>
-     * @param request Запрос с данными проверяемой банковской операции.
-     * @throws InvalidOperationRequestException Если в качестве базовой валюты
-     *                                          указана валюта, отличная от RUB.
-     */
     private void validateBaseCurrency(OperationCheckRequestViewModel request) {
         if (request.baseCurrency() != CurrencyEnumModel.RUB) {
-            throw new InvalidOperationRequestException(
-                    "baseCurrency must be RUB"
-            );
+            throw new InvalidOperationRequestException("baseCurrency must be RUB");
         }
     }
 

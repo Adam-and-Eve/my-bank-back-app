@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import ru.yandex.practicum.bank.exchangegenerator.exceptions.ExchangeClientException;
-import ru.yandex.practicum.bank.exchangegenerator.interfaces.ExchangeClient;
+import ru.yandex.practicum.bank.exchangegenerator.interfaces.InternalExchangeClient;
 import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
 import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
 import ru.yandex.practicum.bank.shared.viewmodels.ExchangeRatesUpdateRequestViewModel;
@@ -17,7 +17,7 @@ import ru.yandex.practicum.bank.shared.viewmodels.ExchangeRatesUpdateRequestView
  * </summary>
  **/
 @Component
-public class HttpExchangeClient implements ExchangeClient {
+public class HttpInternalExchangeClient implements InternalExchangeClient {
 
     // region Fields
 
@@ -32,10 +32,10 @@ public class HttpExchangeClient implements ExchangeClient {
     // region Constructors
 
     @Autowired
-    public HttpExchangeClient(
-        RestClient.Builder restClientBuilder,
-        @Value("${bank.services.exchange-service.base-url}") String exchangeBaseUrl,
-        ServiceTokenProvider serviceTokenProvider
+    public HttpInternalExchangeClient(
+            RestClient.Builder restClientBuilder,
+            @Value("${bank.services.exchange-service.base-url}") String exchangeBaseUrl,
+            ServiceTokenProvider serviceTokenProvider
     ) {
         this (
                 restClientBuilder,
@@ -45,7 +45,7 @@ public class HttpExchangeClient implements ExchangeClient {
         );
     }
 
-    HttpExchangeClient(
+    HttpInternalExchangeClient(
             RestClient.Builder restClientBuilder,
             String exchangeBaseUrl,
             SimpleCircuitBreaker circuitBreaker,
@@ -103,4 +103,5 @@ public class HttpExchangeClient implements ExchangeClient {
     }
 
     // endregion
+
 }

@@ -22,6 +22,21 @@ public record TransferRequestViewModel (
         BigDecimal amount,
 
         @NotNull
-        CurrencyEnumModel currency
+        CurrencyEnumModel currency,
+
+        CurrencyEnumModel targetCurrency
 ) {
+        public TransferRequestViewModel {
+                if (targetCurrency == null) {
+                        targetCurrency = currency;
+                }
+        }
+
+        public TransferRequestViewModel(String recipientLogin, BigDecimal amount, CurrencyEnumModel currency) {
+                this(recipientLogin, amount, currency, currency);
+        }
+
+        public CurrencyEnumModel resolvedTargetCurrency() {
+                return targetCurrency == null ? currency : targetCurrency;
+        }
 }

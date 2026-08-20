@@ -1,6 +1,6 @@
-package ru.yandex.practicum.bank.cash.interfaces;
+package ru.yandex.practicum.bank.shared.interfaces;
 
-import ru.yandex.practicum.bank.cash.exceptions.BlockerClientException;
+import ru.yandex.practicum.bank.shared.exceptions.BlockerClientException;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckResponseViewModel;
 

@@ -1,4 +1,4 @@
-package ru.yandex.practicum.bank.cash.clients;
+package ru.yandex.practicum.bank.shared.clients;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -8,8 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
-import ru.yandex.practicum.bank.cash.exceptions.BlockerClientException;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.exceptions.BlockerClientException;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.shared.models.OperationTypeEnumModel;
 import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
@@ -124,13 +123,14 @@ public class HttpBlockerClientTest {
 
         assertThat(result).isNotNull();
         assertThat(result.allowed()).isTrue();
-        assertThat(result.reason()).isEqualTo("Операция разрешена");
+        assertThat(result.reason())
+                .isEqualTo("Операция разрешена");
     }
 
     /**
      * <summary>
-     * Проверяет корректную передачу данных операции в теле POST-запроса
-     * в Blocker Service.
+     * Проверяет корректную передачу всех данных операции в теле POST-запроса
+     * в Blocker Service, включая исходную и нормализованную суммы.
      * </summary>
      **/
     @Test
@@ -159,7 +159,9 @@ public class HttpBlockerClientTest {
                             "sender": null,
                             "recipient": null,
                             "amount": 500.00,
-                            "currency": "RUB"
+                            "currency": "USD",
+                            "normalizedAmount": 47500.00,
+                            "baseCurrency": "RUB"
                         }
                         """))
                 .andRespond(withSuccess(
@@ -170,6 +172,127 @@ public class HttpBlockerClientTest {
         blockerClient.check(createRequest());
 
         mockServer.verify();
+    }
+
+    /**
+     * <summary>
+     * Проверяет успешную передачу операции в базовой валюте,
+     * когда исходная и нормализованная валюты совпадают.
+     * </summary>
+     **/
+    @Test
+    public void shouldSendRubOperationWithoutCurrencyConversion() {
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var request = new OperationCheckRequestViewModel(
+                "op-rub-123",
+                OperationTypeEnumModel.WITHDRAW,
+                "alexey",
+                null,
+                null,
+                new BigDecimal("500.00"),
+                CurrencyEnumModel.RUB,
+                new BigDecimal("500.00"),
+                CurrencyEnumModel.RUB
+        );
+
+        mockServer.expect(requestTo(CHECK_URI))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(
+                        HttpHeaders.AUTHORIZATION,
+                        "Bearer " + TEST_TOKEN
+                ))
+                .andExpect(content().json("""
+                        {
+                            "operationId": "op-rub-123",
+                            "operationType": "WITHDRAW",
+                            "login": "alexey",
+                            "sender": null,
+                            "recipient": null,
+                            "amount": 500.00,
+                            "currency": "RUB",
+                            "normalizedAmount": 500.00,
+                            "baseCurrency": "RUB"
+                        }
+                        """))
+                .andRespond(withSuccess(
+                        """
+                        {
+                            "allowed": true,
+                            "reason": null
+                        }
+                        """,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        var result = blockerClient.check(request);
+
+        mockServer.verify();
+
+        assertThat(result.allowed()).isTrue();
+        assertThat(result.reason()).isNull();
+    }
+
+    /**
+     * <summary>
+     * Проверяет передачу операции в иностранной валюте с нормализованной
+     * суммой в базовой валюте RUB.
+     * </summary>
+     **/
+    @Test
+    public void shouldSendForeignCurrencyOperationWithNormalizedAmount() {
+        when(serviceTokenProvider.getAccessToken())
+                .thenReturn(TEST_TOKEN);
+
+        var request = new OperationCheckRequestViewModel(
+                "op-usd-123",
+                OperationTypeEnumModel.DEPOSIT,
+                "alexey",
+                null,
+                null,
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.USD,
+                new BigDecimal("9500.00"),
+                CurrencyEnumModel.RUB
+        );
+
+        mockServer.expect(requestTo(CHECK_URI))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(header(
+                        HttpHeaders.AUTHORIZATION,
+                        "Bearer " + TEST_TOKEN
+                ))
+                .andExpect(content().json("""
+                        {
+                            "operationId": "op-usd-123",
+                            "operationType": "DEPOSIT",
+                            "login": "alexey",
+                            "sender": null,
+                            "recipient": null,
+                            "amount": 100.00,
+                            "currency": "USD",
+                            "normalizedAmount": 9500.00,
+                            "baseCurrency": "RUB"
+                        }
+                        """))
+                .andRespond(withSuccess(
+                        """
+                        {
+                            "allowed": true,
+                            "reason": null
+                        }
+                        """,
+                        MediaType.APPLICATION_JSON
+                ));
+
+        var result = blockerClient.check(request);
+
+        mockServer.verify();
+
+        assertThat(result).isNotNull();
+        assertThat(result.allowed()).isTrue();
+        assertThat(result.reason()).isNull();
     }
 
     /**
@@ -276,7 +399,7 @@ public class HttpBlockerClientTest {
     /**
      * <summary>
      * Проверяет срабатывание fallback Circuit Breaker при возникновении
-     * непредвиденного исключения во время выполнения запроса.
+     * непредвиденного исключения во время получения сервисного токена.
      * </summary>
      **/
     @Test
@@ -303,6 +426,8 @@ public class HttpBlockerClientTest {
                 null,
                 null,
                 new BigDecimal("500.00"),
+                CurrencyEnumModel.USD,
+                new BigDecimal("47500.00"),
                 CurrencyEnumModel.RUB
         );
     }

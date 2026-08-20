@@ -62,7 +62,7 @@ public class BlockerControllerTest {
 
     // endregion
 
-    // region Tests
+    // region Successful operations
 
     /**
      * <summary>
@@ -71,15 +71,14 @@ public class BlockerControllerTest {
      */
     @Test
     void checkShouldReturnAllowedOperation() throws Exception {
-        var request = new OperationCheckRequestViewModel(
-                "operation-123",
+        var request = createRequest(
                 OperationTypeEnumModel.TRANSFER,
                 null,
                 "sender-login",
                 "recipient-login",
-                new BigDecimal("1000.00"),
+                "1000.00",
                 CurrencyEnumModel.RUB,
-                new BigDecimal("1000.00"),
+                "1000.00",
                 CurrencyEnumModel.RUB
         );
 
@@ -106,20 +105,19 @@ public class BlockerControllerTest {
     /**
      * <summary>
      * Проверяет успешную проверку операции, заблокированной из-за превышения
-     * максимально допустимой суммы.
+     * максимально допустимой нормализованной суммы.
      * </summary>
      */
     @Test
     void checkShouldReturnBlockedOperation() throws Exception {
-        var request = new OperationCheckRequestViewModel(
-                "operation-123",
+        var request = createRequest(
                 OperationTypeEnumModel.TRANSFER,
                 null,
                 "sender-login",
                 "recipient-login",
-                new BigDecimal("150000.00"),
+                "150000.00",
                 CurrencyEnumModel.RUB,
-                new BigDecimal("150000.00"),
+                "150000.00",
                 CurrencyEnumModel.RUB
         );
 
@@ -143,6 +141,10 @@ public class BlockerControllerTest {
 
         verify(blockerService).check(any());
     }
+
+    // endregion
+
+    // region Validation
 
     /**
      * <summary>
@@ -444,6 +446,10 @@ public class BlockerControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    // endregion
+
+    // region Request body
+
     /**
      * <summary>
      * Проверяет, что запрос без тела
@@ -457,6 +463,48 @@ public class BlockerControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                 )
                 .andExpect(status().isBadRequest());
+    }
+
+    // endregion
+
+    // region Helpers
+
+    /**
+     * <summary>
+     * Создает запрос на проверку банковской операции
+     * с указанными параметрами.
+     * </summary>
+     * @param operationType Тип банковской операции.
+     * @param login Логин пользователя.
+     * @param sender Отправитель денежных средств.
+     * @param recipient Получатель денежных средств.
+     * @param amount Сумма операции в исходной валюте.
+     * @param currency Валюта исходной операции.
+     * @param normalizedAmount Сумма операции, нормализованная в базовую валюту.
+     * @param baseCurrency Базовая валюта нормализованной суммы.
+     * @return Модель запроса на проверку операции.
+     */
+    private OperationCheckRequestViewModel createRequest(
+            OperationTypeEnumModel operationType,
+            String login,
+            String sender,
+            String recipient,
+            String amount,
+            CurrencyEnumModel currency,
+            String normalizedAmount,
+            CurrencyEnumModel baseCurrency) {
+
+        return new OperationCheckRequestViewModel(
+                "operation-id",
+                operationType,
+                login,
+                sender,
+                recipient,
+                new BigDecimal(amount),
+                currency,
+                new BigDecimal(normalizedAmount),
+                baseCurrency
+        );
     }
 
     // endregion
