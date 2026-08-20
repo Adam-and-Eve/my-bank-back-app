@@ -27,6 +27,17 @@ api:
     logout:
       end-session-uri: ${BANK_KEYCLOAK_END_SESSION_URI:http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout}
 
+bank:
+  services:
+    front-ui-service:
+      http-client:
+        circuit-breaker:
+          failure-threshold: ${FRONT_UI_SERVICE_FAILURE_THRESHOLD:3}
+          open-duration: ${FRONT_UI_SERVICE_OPEN_DURATION:3}
+        retry:
+          max-attempts: ${FRONT_UI_SERVICE_MAX_ATTEMPTS:5}
+          backoff: ${FRONT_UI_SERVICE_BACKOFF:100ms}
+
 server:
   port: 8085
   forward-headers-strategy: framework

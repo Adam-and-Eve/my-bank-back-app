@@ -14,6 +14,7 @@ tasks.named<Jar>("jar") {
 }
 
 dependencies {
+    implementation(libs.resilience4j.spring.boot3)
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.actuator)
