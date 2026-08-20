@@ -23,7 +23,7 @@ bank:
   services:
     exchange-service:
       base-url: http://localhost:8086
-    notification:
+    notification-service:
       base-url: http://localhost:8084
     exchange-generator-service:
       fixed-delay-ms: 1000

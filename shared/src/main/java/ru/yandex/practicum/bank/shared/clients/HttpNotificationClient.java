@@ -31,7 +31,7 @@ public class HttpNotificationClient implements NotificationClient {
     @Autowired
     public HttpNotificationClient(
             RestClient.Builder restClientBuilder,
-            @Value("${bank.services.notification.base-url}") String notificationBaseUrl,
+            @Value("${bank.services.notification-service.base-url}") String notificationBaseUrl,
             ServiceTokenProvider serviceTokenProvider
     ) {
         this(

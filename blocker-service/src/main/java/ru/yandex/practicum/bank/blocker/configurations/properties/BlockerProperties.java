@@ -11,7 +11,7 @@ import java.math.BigDecimal;
  * </summary>
  * @param maxAmount Максимальная допустимая сумма банковской операции.
  */
-@ConfigurationProperties(prefix = "bank.blocker")
+@ConfigurationProperties(prefix = "bank.services.blocker-service.blocker")
 public record BlockerProperties (
         BigDecimal maxAmount
 ) {

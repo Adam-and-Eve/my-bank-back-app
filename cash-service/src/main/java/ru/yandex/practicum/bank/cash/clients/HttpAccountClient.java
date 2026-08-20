@@ -40,7 +40,7 @@ public class HttpAccountClient implements AccountClient {
     @Autowired
     public HttpAccountClient(
             RestClient.Builder restClientBuilder,
-            @Value("${bank.services.account.base-url}") String accountBaseUrl,
+            @Value("${bank.services.account-service.base-url}") String accountBaseUrl,
             ServiceTokenProvider serviceTokenProvider,
             ObjectMapper objectMapper
     ) {

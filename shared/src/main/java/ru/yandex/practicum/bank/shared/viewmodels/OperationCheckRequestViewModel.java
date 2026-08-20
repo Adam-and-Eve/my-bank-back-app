@@ -21,8 +21,6 @@ import java.math.BigDecimal;
  * @param recipient Получатель денежных средств.
  * @param amount Сумма операции в исходной валюте.
  * @param currency Валюта операции.
- * @param normalizedAmount Сумма операции, нормализованная относительно базовой валюты.
- * @param baseCurrency Базовая валюта для нормализации суммы операции.
  */
 public record OperationCheckRequestViewModel (
         @NotBlank
@@ -42,13 +40,6 @@ public record OperationCheckRequestViewModel (
         BigDecimal amount,
 
         @NotNull
-        CurrencyEnumModel currency,
-
-        @NotNull
-        @Positive
-        BigDecimal normalizedAmount,
-
-        @NotNull
-        CurrencyEnumModel baseCurrency
+        CurrencyEnumModel currency
 ) {
 }

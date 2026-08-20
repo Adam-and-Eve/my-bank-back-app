@@ -20,10 +20,12 @@ spring:
 
 bank:
   services:
-    account:
-      base-url: ${BANK_ACCOUNT_BASE_URL:http://account-service}
-    notification:
-      base-url: ${BANK_NOTIFICATION_BASE_URL:http://notification-service}
+    account-service:
+      base-url: ${BANK_ACCOUNT_SERVICE_BASE_URL:http://account-service}
+    notification-service:
+      base-url: ${BANK_NOTIFICATION_SERVICE_BASE_URL:http://notification-service}
+    blocker-service:
+      base-url: ${BANK_BLOCKER_SERVICE_BASE_URL:http://blocker-service}
 
 server:
   port: 8082

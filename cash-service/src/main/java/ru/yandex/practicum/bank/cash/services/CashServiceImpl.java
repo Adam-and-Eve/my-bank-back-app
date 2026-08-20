@@ -3,13 +3,17 @@ package ru.yandex.practicum.bank.cash.services;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.bank.cash.exceptions.InvalidAmountException;
 import ru.yandex.practicum.bank.cash.exceptions.InvalidAmountScaleException;
+import ru.yandex.practicum.bank.cash.exceptions.OperationBlockedException;
 import ru.yandex.practicum.bank.cash.interfaces.AccountClient;
+import ru.yandex.practicum.bank.cash.interfaces.BlockerClient;
 import ru.yandex.practicum.bank.cash.interfaces.CashService;
 import ru.yandex.practicum.bank.shared.interfaces.NotificationClient;
 import ru.yandex.practicum.bank.cash.mappers.AccountBalanceMapper;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
+import ru.yandex.practicum.bank.shared.models.OperationTypeEnumModel;
 import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
+import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -18,7 +22,8 @@ import java.util.UUID;
  * <summary>
  * Реализация сервиса операций с наличностью (Cash Service).
  * Обеспечивает бизнес-логику пополнения и снятия денежных средств,
- * валидацию сумм, взаимодействие с сервисом счетов и отправку уведомлений.
+ * валидацию сумм, проверку операций на подозрительность,
+ * взаимодействие с сервисом счетов и отправку уведомлений.
  * </summary>
  **/
 @Service
@@ -27,6 +32,7 @@ public class CashServiceImpl implements CashService {
     // region Fields
 
     private final AccountClient accountClient;
+    private final BlockerClient blockerClient;
     private final NotificationClient notificationClient;
     private final AccountBalanceMapper accountBalanceMapper;
 
@@ -35,9 +41,11 @@ public class CashServiceImpl implements CashService {
     // region Constructors
 
     public CashServiceImpl(AccountClient accountClient,
+                       BlockerClient blockerClient,
                        NotificationClient notificationClient,
                        AccountBalanceMapper accountBalanceMapper) {
         this.accountClient = accountClient;
+        this.blockerClient = blockerClient;
         this.notificationClient = notificationClient;
         this.accountBalanceMapper = accountBalanceMapper;
     }
@@ -62,6 +70,8 @@ public class CashServiceImpl implements CashService {
         validateAmount(request.amount());
 
         var operationId = UUID.randomUUID().toString();
+
+        checkOperation(login, request, operationId, OperationTypeEnumModel.DEPOSIT);
 
         var balance = accountClient.deposit(accountBalanceMapper.toAccountsRequest(login, request, operationId));
 
@@ -92,6 +102,8 @@ public class CashServiceImpl implements CashService {
 
         var operationId = UUID.randomUUID().toString();
 
+        checkOperation(login, request, operationId, OperationTypeEnumModel.WITHDRAW);
+
         var balance = accountClient.withdraw(accountBalanceMapper.toAccountsRequest(login, request, operationId));
 
         notificationClient.notify(new NotificationRequestViewModel(
@@ -118,6 +130,38 @@ public class CashServiceImpl implements CashService {
 
         if (amount.scale() > 2) {
             throw new InvalidAmountScaleException();
+        }
+    }
+
+    /**
+     * <summary>
+     * Проверяет финансовую операцию через сервис блокировки подозрительных операций.
+     * Если операция запрещена, выполнение прерывается с соответствующим исключением.
+     * </summary>
+     * @param login Логин пользователя, выполняющего операцию.
+     * @param request Модель запроса на операцию с наличностью.
+     * @param operationId Уникальный идентификатор операции.
+     * @param operationType Тип финансовой операции.
+     * @throws OperationBlockedException Если операция признана подозрительной.
+     **/
+    private void checkOperation(
+            String login,
+            CashOperationRequestViewModel request,
+            String operationId,
+            OperationTypeEnumModel operationType
+    ) {
+        var response = blockerClient.check(new OperationCheckRequestViewModel(
+                operationId,
+                operationType,
+                login,
+                null,
+                null,
+                request.amount(),
+                request.currency()
+        ));
+
+        if (!response.allowed()) {
+            throw new OperationBlockedException(response.reason());
         }
     }
 

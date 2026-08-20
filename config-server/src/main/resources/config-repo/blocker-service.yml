@@ -9,8 +9,10 @@ spring:
           jwk-set-uri: ${BANK_KEYCLOAK_JWK_SET_URI:http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/certs}
 
 bank:
-  blocker:
-    max-amount: ${BANK_BLOCKER_SERVICE_MAX_AMOUNT:100000.00}
+  services:
+    blocker-service:
+      blocker:
+        max-amount: ${BANK_BLOCKER_SERVICE_MAX_AMOUNT:100000.00}
 
 server:
   port: 8088

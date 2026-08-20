@@ -16,8 +16,8 @@ spring:
 
 bank:
   services:
-    notification:
-      base-url: ${BANK_NOTIFICATION_BASE_URL:http://notification-service}
+    notification-service:
+      base-url: ${BANK_NOTIFICATION_SERVICE_BASE_URL:http://notification-service}
     exchange-service:
       base-url: ${BANK_EXCHANGE_SERVICE_BASE_URL:http://exchange-service}
 
