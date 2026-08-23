@@ -1,0 +1,4 @@
+global:
+  namespace: dev
+  imageTag: dev
+

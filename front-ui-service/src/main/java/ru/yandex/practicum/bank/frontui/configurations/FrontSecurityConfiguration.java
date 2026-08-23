@@ -8,6 +8,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -40,17 +41,28 @@ public class FrontSecurityConfiguration {
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            @Value("${api.security.logout.end-session-uri}") URI endSessionUri
+            @Value("${bank.public-base-url}") URI publicBaseUrl,
+            @Value("${bank.security.logout.end-session-uri}") URI endSessionUri
     ) throws Exception {
+        var loginEntryPoint =
+                new LoginUrlAuthenticationEntryPoint(
+                        "/oauth2/authorization/front-ui-service"
+                );
+
+        loginEntryPoint.setFavorRelativeUris(true);
+
         return http
                 .authorizeHttpRequests(requests -> requests
                         .requestMatchers("/css/**", "/actuator/health", "/actuator/info").permitAll()
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(exceptions ->
+                        exceptions.authenticationEntryPoint(loginEntryPoint)
+                )
                 .oauth2Login(oauth2 -> oauth2.defaultSuccessUrl("/", true))
                 .logout(logout -> logout
                         .logoutUrl("/logout")
-                        .logoutSuccessHandler(oidcLogoutSuccessHandler(endSessionUri))
+                        .logoutSuccessHandler(oidcLogoutSuccessHandler(publicBaseUrl, endSessionUri))
                         .invalidateHttpSession(true)
                         .clearAuthentication(true)
                 )
@@ -69,9 +81,12 @@ public class FrontSecurityConfiguration {
      * @param endSessionUri URI завершения сессии авторизационного сервера.
      * @return Кастомный обработчик выхода из системы.
      **/
-    private LogoutSuccessHandler oidcLogoutSuccessHandler(URI endSessionUri) {
+    private LogoutSuccessHandler oidcLogoutSuccessHandler(
+            URI publicBaseUrl,
+            URI endSessionUri) {
         return (request, response, authentication) -> {
-            var postLogoutRedirectUri = ServletUriComponentsBuilder.fromCurrentContextPath()
+            var postLogoutRedirectUri = ServletUriComponentsBuilder
+                    .fromUri(publicBaseUrl)
                     .path("/")
                     .build()
                     .toUriString();

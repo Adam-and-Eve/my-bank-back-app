@@ -34,7 +34,7 @@ public class RestGatewayClient implements GatewayClient {
 
     // region Fields
 
-    private final RestClient accountsClient;
+    private final RestClient accountClient;
 
     private final RestClient cashClient;
 
@@ -58,20 +58,25 @@ public class RestGatewayClient implements GatewayClient {
      * Автоматически создает CircuitBreaker с настройками по умолчанию.
      * </summary>
      * @param restClientBuilder Билдер для настройки и сборки {@link RestClient}.
-     * @param gatewayBaseUrl Базовый URL API Gateway из конфигурации приложений.
      **/
     @Autowired
     public RestGatewayClient(
             RestClient.Builder restClientBuilder,
-            @Value("${api.gateway.base-url}") String gatewayBaseUrl,
+            @Value("${bank.services.account-service.base-url}") String accountServiceBaseUrl,
+            @Value("${bank.services.cash-service.base-url}") String cashServiceBaseUrl,
+            @Value("${bank.services.transfer-service.base-url}") String transferServiceBaseUrl,
+            @Value("${bank.services.exchange-service.base-url}") String exchangeServiceBaseUrl,
             ResilientFactoryClient resilientClientFactory,
             GatewayRequestMapper gatewayRequestMapper,
             ObjectMapper objectMapper
     ) {
         this(
                 restClientBuilder,
-                gatewayBaseUrl,
-                resilientClientFactory.create("apiServices", RestGatewayClient::isRecoverable),
+                accountServiceBaseUrl,
+                cashServiceBaseUrl,
+                transferServiceBaseUrl,
+                exchangeServiceBaseUrl,
+                resilientClientFactory.create("bankServices", RestGatewayClient::isRecoverable),
                 gatewayRequestMapper,
                 objectMapper
         );
@@ -82,33 +87,35 @@ public class RestGatewayClient implements GatewayClient {
      * Конструктор с возможностью явного указания экземпляра CircuitBreaker (используется в тестах).
      * </summary>
      * @param restClientBuilder Билдер для настройки и сборки {@link RestClient}.
-     * @param gatewayBaseUrl Базовый URL API Gateway.
      **/
     RestGatewayClient(
             RestClient.Builder restClientBuilder,
-            String gatewayBaseUrl,
+            String accountServiceBaseUrl,
+            String cashServiceBaseUrl,
+            String transferServiceBaseUrl,
+            String exchangeServiceBaseUrl,
             ResilientExecutorClient clientExecutor,
             GatewayRequestMapper gatewayRequestMapper,
             ObjectMapper objectMapper
     ) {
-        this.accountsClient = restClientBuilder
+        this.accountClient = restClientBuilder
                 .clone()
-                .baseUrl(gatewayBaseUrl)
+                .baseUrl(accountServiceBaseUrl)
                 .build();
 
         this.cashClient = restClientBuilder
                 .clone()
-                .baseUrl(gatewayBaseUrl)
+                .baseUrl(cashServiceBaseUrl)
                 .build();
 
         this.transferClient = restClientBuilder
                 .clone()
-                .baseUrl(gatewayBaseUrl)
+                .baseUrl(transferServiceBaseUrl)
                 .build();
 
         this.exchangeClient = restClientBuilder
                 .clone()
-                .baseUrl(gatewayBaseUrl)
+                .baseUrl(exchangeServiceBaseUrl)
                 .build();
 
         this.clientExecutor = clientExecutor;
@@ -213,7 +220,7 @@ public class RestGatewayClient implements GatewayClient {
      **/
     private AccountResponseViewModel getAccountWithoutCircuitBreaker(String accessToken) {
         try {
-            return accountsClient.get()
+            return accountClient.get()
                     .uri("/api/account/me")
                     .headers(headers -> headers.setBearerAuth(accessToken))
                     .retrieve()
@@ -250,7 +257,7 @@ public class RestGatewayClient implements GatewayClient {
             String accessToken,
             AccountFormViewModel form) {
         try {
-            return accountsClient.put()
+            return accountClient.put()
                     .uri("/api/account/me")
                     .headers(headers -> headers.setBearerAuth(accessToken))
                     .body(gatewayRequestMapper.toUpdateAccountRequest(form))
@@ -282,7 +289,7 @@ public class RestGatewayClient implements GatewayClient {
      **/
     private List<RecipientResponseViewModel> getRecipientsWithoutCircuitBreaker(String accessToken) {
         try {
-            RecipientResponseViewModel[] recipients = accountsClient.get()
+            RecipientResponseViewModel[] recipients = accountClient.get()
                     .uri("/api/account/recipients")
                     .headers(headers -> headers.setBearerAuth(accessToken))
                     .retrieve()

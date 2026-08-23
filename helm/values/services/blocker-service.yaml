@@ -1,0 +1,14 @@
+blocker-service:
+  enabled: true
+
+  fullnameOverride: blocker-service
+
+  image:
+    repository: my-bank-blocker-service
+
+  service:
+    port: 8088
+
+  env:
+    BANK_SERVICES_BLOCKER_SERVICE_MAX_AMOUNT: "100000.00"
+    SERVER_PORT: "8088"

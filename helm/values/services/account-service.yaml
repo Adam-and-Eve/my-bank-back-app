@@ -1,0 +1,25 @@
+account-service:
+  enabled: true
+
+  fullnameOverride: account-service
+
+  image:
+    repository: my-bank-account-service
+
+  service:
+    port: 8081
+
+  env:
+    BANK_DATASOURCE_URL: jdbc:postgresql://postgresql:5432/my-bank
+    BANK_DATASOURCE_USERNAME: postgres
+    SPRING_JPA_HIBERNATE_DDLAUTO: validate
+    SPRING_JPA_OPENINVIEW: "false"
+    SERVER_PORT: "8081"
+
+  secretEnv:
+    - name: BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET
+    - name: BANK_DATASOURCE_PASSWORD
+      secretName: postgresql-credentials
+      key: password

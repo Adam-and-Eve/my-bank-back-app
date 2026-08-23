@@ -1,0 +1,18 @@
+notification-service:
+  enabled: true
+
+  fullnameOverride: notification-service
+
+  image:
+    repository: my-bank-notification-service
+
+  service:
+    port: 8084
+
+  env:
+    SERVER_PORT: "8084"
+
+  secretEnv:
+    - name: BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET

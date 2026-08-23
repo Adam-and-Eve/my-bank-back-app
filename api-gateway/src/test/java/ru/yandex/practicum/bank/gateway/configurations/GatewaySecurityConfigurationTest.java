@@ -67,7 +67,7 @@ public class GatewaySecurityConfigurationTest {
                 .filteredOn(route -> "account-service".equals(route.getId()))
                 .singleElement()
                 .satisfies(route -> {
-                    assertThat(route.getUri().toString()).isEqualTo("lb://account-service");
+                    assertThat(route.getUri().toString()).isEqualTo("http://account-service:8081");
                     assertThat(route.getPredicates())
                             .anySatisfy(predicate -> assertThat(predicate.getArgs())
                                     .containsValue("/api/account/**"));
@@ -93,7 +93,7 @@ public class GatewaySecurityConfigurationTest {
                 .filteredOn(route -> "cash-service".equals(route.getId()))
                 .singleElement()
                 .satisfies(route -> {
-                    assertThat(route.getUri().toString()).isEqualTo("lb://cash-service");
+                    assertThat(route.getUri().toString()).isEqualTo("http://cash-service:8082");
                     assertThat(route.getPredicates())
                             .anySatisfy(predicate -> assertThat(predicate.getArgs())
                                     .containsValue("/api/cash/**"));
@@ -119,7 +119,7 @@ public class GatewaySecurityConfigurationTest {
                 .filteredOn(route -> "transfer-service".equals(route.getId()))
                 .singleElement()
                 .satisfies(route -> {
-                    assertThat(route.getUri().toString()).isEqualTo("lb://transfer-service");
+                    assertThat(route.getUri().toString()).isEqualTo("http://transfer-service:8083");
                     assertThat(route.getPredicates())
                             .anySatisfy(predicate -> assertThat(predicate.getArgs())
                                     .containsValue("/api/transfer")

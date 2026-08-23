@@ -77,6 +77,9 @@ public class RestGatewayClientTest {
         gatewayClient = new RestGatewayClient(
                 restClientBuilder,
                 GATEWAY_BASE_URL,
+                GATEWAY_BASE_URL,
+                GATEWAY_BASE_URL,
+                GATEWAY_BASE_URL,
                 clientExecutor,
                 gatewayRequestMapper,
                 new ObjectMapper().findAndRegisterModules()

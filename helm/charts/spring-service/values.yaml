@@ -1,0 +1,23 @@
+replicaCount: 1
+
+inheritGlobalEnv: true
+
+image:
+  repository: ""
+  tag: local
+  pullPolicy: IfNotPresent
+
+service:
+  enabled: true
+  port: 8080
+  type: ClusterIP
+
+env: {}
+secretEnv: []
+resources: {}
+
+test:
+  enabled: false
+  imageRepository: curlimages/curl
+  imageTag: "8.21.0"
+  imagePullPolicy: IfNotPresent
