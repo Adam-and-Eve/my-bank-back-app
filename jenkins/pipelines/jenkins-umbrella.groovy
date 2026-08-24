@@ -62,6 +62,11 @@ def createKeycloakRealmSecret(String namespace) {
             )
     ]) {
         runCommand(
+                "kubectl create namespace ${namespace} " +
+                        "--dry-run=client -o yaml | kubectl apply -f -"
+        )
+
+        runCommand(
                 "kubectl create secret generic keycloak-realm " +
                         "--from-file=my-bank-realm-realm.json=envs/runtime/my-bank-realm-realm.json " +
                         "--namespace ${namespace} " +

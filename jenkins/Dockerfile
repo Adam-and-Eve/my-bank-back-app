@@ -11,6 +11,7 @@ RUN apt-get update \
         age \
     && rm -rf /var/lib/apt/lists/*
 
+# Docker CLI
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg \
         -o /etc/apt/keyrings/docker.asc \
     && chmod a+r /etc/apt/keyrings/docker.asc \
@@ -20,15 +21,20 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg \
     && apt-get install -y --no-install-recommends docker-ce-cli \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+# Helm
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash \
+    && helm version
 
-RUN curl -L \
-        https://github.com/getsops/sops/releases/latest/download/sops-v3.10.2.linux.amd64 \
-        -o /usr/local/bin/sops \
-    && chmod +x /usr/local/bin/sops
+# SOPS
+RUN curl -Lo /usr/local/bin/sops \
+        https://github.com/getsops/sops/releases/download/v3.10.2/sops-v3.10.2.linux.amd64 \
+    && chmod +x /usr/local/bin/sops \
+    && sops --version
 
+# kubectl
 RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
     && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
-    && rm kubectl
+    && rm kubectl \
+    && kubectl version --client
 
 USER jenkins
