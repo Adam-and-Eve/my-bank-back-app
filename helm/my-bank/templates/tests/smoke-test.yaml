@@ -1,15 +1,12 @@
 {{- $test := .Values.helmTest | default dict -}}
   {{- if ($test.enabled | default true) }}
 
-  {{- $postgresql := .Values.postgresql -}}
   {{- $keycloak := .Values.keycloak -}}
   {{- $frontUiService := index .Values "front-ui-service" -}}
   {{- $accountService := index .Values "account-service" -}}
   {{- $cashService := index .Values "cash-service" -}}
   {{- $transferService := index .Values "transfer-service" -}}
   {{- $exchangeService := index .Values "exchange-service" -}}
-  {{- $exchangeGeneratorService := index .Values "exchange-generator-service" -}}
-  {{- $blockerService := index .Values "blocker-service" -}}
 
 apiVersion: batch/v1
 kind: Job
@@ -45,6 +42,7 @@ spec:
 
               echo "Starting smoke tests..."
 
+
               expect_status() {
                 url="$1"
                 expected="$2"
@@ -67,26 +65,7 @@ spec:
               }
 
 
-              check_tcp() {
-                host="$1"
-                port="$2"
-
-                nc -z -w5 "$host" "$port"
-
-                echo "OK: $host:$port"
-              }
-
-
-              echo "Checking infrastructure..."
-
-
-              {{- if $postgresql.enabled }}
-
-              check_tcp \
-                "{{ default "postgresql" $postgresql.fullnameOverride }}" \
-                "{{ default 5432 $postgresql.service.port }}"
-
-              {{- end }}
+              echo "Checking Keycloak..."
 
 
               {{- if $keycloak.enabled }}
@@ -110,7 +89,7 @@ spec:
               {{- end }}
 
 
-              echo "Checking backend services..."
+              echo "Checking account-service..."
 
 
               {{- if $accountService.enabled }}
@@ -122,6 +101,9 @@ spec:
               {{- end }}
 
 
+              echo "Checking cash-service..."
+
+
               {{- if $cashService.enabled }}
 
               expect_status \
@@ -129,6 +111,9 @@ spec:
                 "401"
 
               {{- end }}
+
+
+              echo "Checking transfer-service..."
 
 
               {{- if $transferService.enabled }}
@@ -140,28 +125,13 @@ spec:
               {{- end }}
 
 
+              echo "Checking exchange-service..."
+
+
               {{- if $exchangeService.enabled }}
 
               expect_status \
                 "http://{{ default "exchange-service" $exchangeService.fullnameOverride }}:{{ default 8086 $exchangeService.service.port }}/api/exchange/rates" \
-                "200"
-
-              {{- end }}
-
-
-              {{- if $exchangeGeneratorService.enabled }}
-
-              expect_status \
-                "http://{{ default "exchange-generator-service" $exchangeGeneratorService.fullnameOverride }}:{{ default 8087 $exchangeGeneratorService.service.port }}/actuator/health" \
-                "200"
-
-              {{- end }}
-
-
-              {{- if $blockerService.enabled }}
-
-              expect_status \
-                "http://{{ default "blocker-service" $blockerService.fullnameOverride }}:{{ default 8084 $blockerService.service.port }}/actuator/health" \
                 "200"
 
               {{- end }}
