@@ -16,8 +16,9 @@ x-keycloak-env: &keycloak-env
   KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
   KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
   KC_HEALTH_ENABLED: "true"
-  KC_HOSTNAME: http://localhost:8180
-  KC_HTTP_PORT: 8080
+  KC_HOSTNAME: ${KC_HOSTNAME}
+  KC_HOSTNAME_STRICT: ${KC_HOSTNAME_STRICT}
+  KC_HTTP_PORT: ${KC_HTTP_PORT}
 
   BANK_PUBLIC_BASE_URL: ${BANK_PUBLIC_BASE_URL}
 
@@ -29,16 +30,16 @@ x-keycloak-env: &keycloak-env
   BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET}
 
 x-notification-service-env: &notification-service-env
-  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_USER_INFO_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
   BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET}
   SERVER_PORT: "8084"
 
 
 x-transfer-service-env: &transfer-service-env
-  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
-  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_USER_INFO_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
+  BANK_KEYCLOAK_TOKEN_URI: ${BANK_KEYCLOAK_TOKEN_URI}
 
   BANK_SERVICES_TRANSFER_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_TRANSFER_SERVICE_CLIENT_SECRET}
 
@@ -51,9 +52,9 @@ x-transfer-service-env: &transfer-service-env
 
 
 x-cash-service-env: &cash-service-env
-  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
-  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
+  BANK_KEYCLOAK_TOKEN_URI: ${BANK_KEYCLOAK_TOKEN_URI}
 
   BANK_SERVICES_CASH_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_CASH_SERVICE_CLIENT_SECRET}
 
@@ -66,8 +67,8 @@ x-cash-service-env: &cash-service-env
 
 
 x-account-service-env: &account-service-env
-  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
 
   BANK_DATASOURCE_URL: jdbc:postgresql://postgres:5432/my-bank
   BANK_DATASOURCE_USERNAME: postgres
@@ -79,15 +80,16 @@ x-account-service-env: &account-service-env
 
 x-front-ui-service-env: &front-ui-service-env
   BANK_SERVICES_FRONT_UI_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_FRONT_UI_SERVICE_CLIENT_SECRET}
-  BANK_SERVICES_FRONT_UI_SERVICE_PUBLIC_URL: ${BANK_SERVICES_FRONT_UI_SERVICE_PUBLIC_URL}
 
-  BANK_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/auth
-  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
-  BANK_KEYCLOAK_USER_INFO_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/userinfo
-  BANK_KEYCLOAK_END_SESSION_URI: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout
+  BANK_KEYCLOAK_AUTHORIZATION_URI: ${BANK_KEYCLOAK_AUTHORIZATION_URI}
+  BANK_KEYCLOAK_TOKEN_URI: ${BANK_KEYCLOAK_TOKEN_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
+  BANK_KEYCLOAK_USER_INFO_URI: ${BANK_KEYCLOAK_USER_INFO_URI}
+  BANK_KEYCLOAK_END_SESSION_URI: ${BANK_KEYCLOAK_END_SESSION_URI}
 
   BANK_PUBLIC_BASE_URL: ${BANK_PUBLIC_BASE_URL}
+  BANK_KEYCLOAK_REDIRECT_URI: ${BANK_KEYCLOAK_REDIRECT_URI}
+
   BANK_SERVICES_ACCOUNT_SERVICE_BASE_URL: ${BANK_SERVICES_ACCOUNT_SERVICE_BASE_URL}
   BANK_SERVICES_CASH_SERVICE_BASE_URL: ${BANK_SERVICES_CASH_SERVICE_BASE_URL}
   BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL}
@@ -97,16 +99,16 @@ x-front-ui-service-env: &front-ui-service-env
 
 
 x-exchange-service-env: &exchange-service-env
-  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
 
   SERVER_PORT: "8086"
 
 
 x-exchange-generator-service-env: &exchange-generator-service-env
-  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
-  BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
+  BANK_KEYCLOAK_TOKEN_URI: ${BANK_KEYCLOAK_TOKEN_URI}
 
   BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET}
 
@@ -119,14 +121,14 @@ x-exchange-generator-service-env: &exchange-generator-service-env
 
 
 x-blocker-service-env: &blocker-service-env
-  BANK_KEYCLOAK_ISSUER_URI: http://localhost:8180/realms/my-bank-realm
-  BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
+  BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
 
   BANK_SERVICES_BLOCKER_SERVICE_MAX_AMOUNT: ${BANK_SERVICES_BLOCKER_SERVICE_MAX_AMOUNT}
 
   SERVER_PORT: "8088"
 
-x-jenkins-env: &jenkins-env:
+x-jenkins-env: &jenkins-env
   JENKINS_ADMIN_ID: admin
   JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD}
 
