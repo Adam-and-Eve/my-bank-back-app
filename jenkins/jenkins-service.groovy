@@ -8,7 +8,8 @@ def runCommand(String linuxCommand, String windowsCommand = null) {
 
 def gradle(String args) {
     runCommand(
-            "./gradlew --no-daemon --console=plain ${args}",
+            "chmod +x ./gradlew && " +
+                    "./gradlew --no-daemon --console=plain ${args}",
             ".\\gradlew.bat --no-daemon --console=plain ${args}"
     )
 }
@@ -24,7 +25,12 @@ def decryptSecrets(String environment) {
                 "mkdir -p envs/runtime && " +
                         "sops --decrypt " +
                         "envs/secrets/values-secrets-${environment}.enc.yaml " +
-                        "> envs/runtime/values-secrets-${environment}.yaml"
+                        "> envs/runtime/values-secrets-${environment}.yaml",
+
+                "if not exist envs\\runtime mkdir envs\\runtime && " +
+                        "sops --decrypt " +
+                        "envs\\secrets\\values-secrets-${environment}.enc.yaml " +
+                        "> envs\\runtime\\values-secrets-${environment}.yaml"
         )
     }
 }
@@ -35,8 +41,10 @@ def cleanupRuntimeSecrets() {
                     "envs/runtime/values-secrets-test.yaml " +
                     "envs/runtime/values-secrets-prod.yaml",
 
-            "if exist envs\\runtime\\values-secrets-test.yaml del /f /q envs\\runtime\\values-secrets-test.yaml " +
-                    "& if exist envs\\runtime\\values-secrets-prod.yaml del /f /q envs\\runtime\\values-secrets-prod.yaml"
+            "if exist envs\\runtime\\values-secrets-test.yaml " +
+                    "del /f /q envs\\runtime\\values-secrets-test.yaml " +
+                    "& if exist envs\\runtime\\values-secrets-prod.yaml " +
+                    "del /f /q envs\\runtime\\values-secrets-prod.yaml"
     )
 }
 
@@ -66,10 +74,16 @@ def deployService(
                         "--set image.tag=${imageTag}"
 
         runCommand(
+                "${command} --dry-run=client",
+
                 "${command} --dry-run=client"
         )
 
-        runCommand(command)
+        runCommand(
+                command,
+
+                command
+        )
     }
 }
 
@@ -146,6 +160,8 @@ def runServicePipeline(Map service) {
         stage('Docker build') {
             if (params.BUILD_IMAGE || params.PUSH_IMAGE) {
                 runCommand(
+                        "docker build -t ${image} ${service.serviceName}",
+
                         "docker build -t ${image} ${service.serviceName}"
                 )
             } else {
@@ -174,7 +190,11 @@ def runServicePipeline(Map service) {
                                     "--password-stdin"
                     )
 
-                    runCommand("docker push ${image}")
+                    runCommand(
+                            "docker push ${image}",
+
+                            "docker push ${image}"
+                    )
                 }
             } else {
                 echo 'Image push skipped by parameter.'
@@ -194,7 +214,11 @@ def runServicePipeline(Map service) {
                 runCommand(
                         "helm lint ${service.chartPath} " +
                                 "-f ${service.valuesPath} " +
-                                "-f envs/runtime/values-secrets-test.yaml"
+                                "-f envs/runtime/values-secrets-test.yaml",
+
+                        "helm lint ${service.chartPath} " +
+                                "-f ${service.valuesPath} " +
+                                "-f envs\\runtime\\values-secrets-test.yaml"
                 )
 
                 runCommand(
@@ -204,15 +228,33 @@ def runServicePipeline(Map service) {
                                 "-f ${service.valuesPath} " +
                                 "-f envs/runtime/values-secrets-test.yaml " +
                                 "--set image.repository=${imageRepository} " +
+                                "--set image.tag=${imageTag}",
+
+                        "helm template ${service.serviceName} " +
+                                "${service.chartPath} " +
+                                "--namespace test " +
+                                "-f ${service.valuesPath} " +
+                                "-f envs\\runtime\\values-secrets-test.yaml " +
+                                "--set image.repository=${imageRepository} " +
                                 "--set image.tag=${imageTag}"
                 )
             } else {
                 runCommand(
                         "helm lint ${service.chartPath} " +
+                                "-f ${service.valuesPath}",
+
+                        "helm lint ${service.chartPath} " +
                                 "-f ${service.valuesPath}"
                 )
 
                 runCommand(
+                        "helm template ${service.serviceName} " +
+                                "${service.chartPath} " +
+                                "--namespace test " +
+                                "-f ${service.valuesPath} " +
+                                "--set image.repository=${imageRepository} " +
+                                "--set image.tag=${imageTag}",
+
                         "helm template ${service.serviceName} " +
                                 "${service.chartPath} " +
                                 "--namespace test " +
