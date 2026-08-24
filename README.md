@@ -382,8 +382,6 @@ docker.io/<docker-login>
 
 `Build`
 
----
-
 ### 11. Проверить:
 
 ```bash
@@ -395,6 +393,18 @@ kubectl port-forward -n test svc/my-bank-gateway-nginx 8080:80
 ```
 
 http://localhost:8080
+
+### 12. Удалить:
+
+```bash
+helm uninstall my-bank -n prod
+```
+
+```bash
+kubectl delete namespace prod
+```
+
+---
 
 # Kubernetes Deployment вручную
 
