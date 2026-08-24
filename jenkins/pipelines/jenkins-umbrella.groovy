@@ -95,7 +95,8 @@ def helmDeploy(
                 "helm upgrade --install my-bank helm/my-bank " +
                         "--namespace ${namespace} " +
                         "--create-namespace " +
-                        "--rollback-on-failure " +
+                        "--atomic " +
+                        "--wait " +
                         "--timeout 5m " +
                         "-f ${valuesFile} " +
                         "${values} " +
@@ -104,7 +105,7 @@ def helmDeploy(
                         "--set global.imageTag=${imageTag}"
 
         runCommand(
-                "${command} --dry-run=client"
+                "${command} --dry-run"
         )
 
         runCommand(command)
@@ -166,6 +167,7 @@ def runUmbrellaPipeline() {
     def registryHost = params.IMAGE_REGISTRY.tokenize('/')[0]
 
     try {
+
         stage('Validate') {
             gradle('projects')
         }
@@ -194,6 +196,7 @@ def runUmbrellaPipeline() {
 
         stage('Image push') {
             if (params.PUSH_IMAGES) {
+
                 withCredentials([
                         usernamePassword(
                                 credentialsId: 'my-bank-registry-credentials',
@@ -201,20 +204,12 @@ def runUmbrellaPipeline() {
                                 passwordVariable: 'REGISTRY_PASSWORD'
                         )
                 ]) {
-                    echo "Registry: ${params.IMAGE_REGISTRY}"
-                    echo "Registry host: ${registryHost}"
-                    echo "Username length: ${REGISTRY_USERNAME.length()}"
 
                     runCommand(
                             'printf "%s" "$REGISTRY_PASSWORD" | ' +
                                     "docker login ${registryHost} " +
                                     '--username "$REGISTRY_USERNAME" ' +
-                                    '--password-stdin',
-
-                            "echo %REGISTRY_PASSWORD%| " +
-                                    "docker login ${registryHost} " +
-                                    "--username %REGISTRY_USERNAME% " +
-                                    "--password-stdin"
+                                    '--password-stdin'
                     )
 
                     services.each { service ->
@@ -224,6 +219,7 @@ def runUmbrellaPipeline() {
                         )
                     }
                 }
+
             } else {
                 echo 'Image push skipped by parameter.'
             }
@@ -231,16 +227,19 @@ def runUmbrellaPipeline() {
 
         stage('Kubernetes validation') {
             if (params.DEPLOY_TEST || params.DEPLOY_PROD) {
+
                 withCredentials([
                         file(
                                 credentialsId: 'my-bank-kubeconfig',
                                 variable: 'KUBECONFIG'
                         )
                 ]) {
+
                     runCommand('kubectl cluster-info')
                     runCommand('kubectl get nodes')
                     runCommand('helm version')
                 }
+
             } else {
                 echo 'Kubernetes validation skipped because deployment is disabled.'
             }
@@ -249,53 +248,41 @@ def runUmbrellaPipeline() {
         stage('Prepare test secrets') {
             if (params.DEPLOY_TEST) {
                 decryptSecrets('test')
-            } else {
-                echo 'Test secrets preparation skipped by parameter.'
             }
         }
 
         stage('Helm lint and template') {
+
             def values = serviceValuesArgs(services)
 
             runCommand('helm dependency update helm/my-bank')
 
-            if (params.DEPLOY_TEST) {
-                runCommand(
-                        "helm lint helm/my-bank " +
-                                "-f helm/my-bank/values-test.yaml " +
-                                "${values} " +
-                                "-f envs/runtime/values-secrets-test.yaml"
-                )
+            runCommand(
+                    "helm lint helm/my-bank " +
+                            "-f helm/my-bank/values-test.yaml " +
+                            "${values} " +
+                            (params.DEPLOY_TEST
+                                    ? "-f envs/runtime/values-secrets-test.yaml"
+                                    : "")
+            )
 
-                runCommand(
-                        "helm template my-bank helm/my-bank " +
-                                "--namespace test " +
-                                "-f helm/my-bank/values-test.yaml " +
-                                "${values} " +
-                                "-f envs/runtime/values-secrets-test.yaml " +
-                                "--set global.imageRegistry=${params.IMAGE_REGISTRY} " +
-                                "--set global.imageTag=${imageTag}"
-                )
-            } else {
-                runCommand(
-                        "helm lint helm/my-bank " +
-                                "-f helm/my-bank/values-test.yaml " +
-                                "${values}"
-                )
-
-                runCommand(
-                        "helm template my-bank helm/my-bank " +
-                                "--namespace test " +
-                                "-f helm/my-bank/values-test.yaml " +
-                                "${values} " +
-                                "--set global.imageRegistry=${params.IMAGE_REGISTRY} " +
-                                "--set global.imageTag=${imageTag}"
-                )
-            }
+            runCommand(
+                    "helm template my-bank helm/my-bank " +
+                            "--namespace test " +
+                            "-f helm/my-bank/values-test.yaml " +
+                            "${values} " +
+                            (params.DEPLOY_TEST
+                                    ? "-f envs/runtime/values-secrets-test.yaml"
+                                    : "") +
+                            " --set global.imageRegistry=${params.IMAGE_REGISTRY}" +
+                            " --set global.imageTag=${imageTag}"
+            )
         }
 
         stage('Deploy test') {
+
             if (params.DEPLOY_TEST) {
+
                 createKeycloakRealmSecret('test')
 
                 helmDeploy(
@@ -315,32 +302,31 @@ def runUmbrellaPipeline() {
                 ]) {
                     runCommand('helm test my-bank --namespace test')
                 }
-            } else {
-                echo 'Test deploy skipped by parameter.'
+
             }
         }
 
         stage('Manual approval') {
+
             if (params.DEPLOY_PROD) {
                 input(
                         message: 'Deploy my-bank umbrella release to prod?',
                         ok: 'Deploy'
                 )
-            } else {
-                echo 'Production deploy skipped by parameter.'
             }
         }
 
         stage('Prepare prod secrets') {
+
             if (params.DEPLOY_PROD) {
                 decryptSecrets('prod')
-            } else {
-                echo 'Production secrets preparation skipped by parameter.'
             }
         }
 
         stage('Deploy prod') {
+
             if (params.DEPLOY_PROD) {
+
                 createKeycloakRealmSecret('prod')
 
                 helmDeploy(
@@ -351,11 +337,11 @@ def runUmbrellaPipeline() {
                         params.IMAGE_REGISTRY,
                         imageTag
                 )
-            } else {
-                echo 'Production deploy skipped by parameter.'
             }
         }
+
     } finally {
+
         stage('Cleanup secrets') {
             echo 'Removing decrypted secrets from Jenkins workspace...'
             cleanupRuntimeSecrets()
