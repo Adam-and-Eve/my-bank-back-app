@@ -3,7 +3,6 @@ package ru.yandex.practicum.bank.shared.configurations;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.cloud.client.loadbalancer.LoadBalanced;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.client.RestClient;
@@ -20,7 +19,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * </summary>
  **/
 @SpringBootTest(classes = RestClientConfiguration.class)
-@TestPropertySource(properties = "spring.cloud.config.enabled=false")
 public class RestClientConfigurationTest {
 
     // region Fields
@@ -48,19 +46,6 @@ public class RestClientConfigurationTest {
         var bean = applicationContext.getBean(RestClient.Builder.class);
 
         assertThat(bean).isSameAs(restClientBuilder);
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что фабричный метод restClientBuilder
-     * помечен аннотацией @LoadBalanced.
-     * </summary>
-     **/
-    @Test
-    public void shouldHaveLoadBalancedAnnotationOnBeanMethod() throws NoSuchMethodException {
-        Method method = RestClientConfiguration.class.getDeclaredMethod("restClientBuilder");
-
-        assertThat(method.isAnnotationPresent(LoadBalanced.class)).isTrue();
     }
 
     /**
