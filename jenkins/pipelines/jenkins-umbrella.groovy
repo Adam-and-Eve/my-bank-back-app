@@ -55,12 +55,14 @@ def cleanupRuntimeSecrets() {
 }
 
 def createKeycloakRealmSecret(String namespace) {
+
     withCredentials([
             file(
                     credentialsId: 'my-bank-kubeconfig',
                     variable: 'KUBECONFIG'
             )
     ]) {
+
         runCommand(
                 "kubectl create namespace ${namespace} " +
                         "--dry-run=client -o yaml | kubectl apply -f -"
@@ -83,12 +85,14 @@ def helmDeploy(
         String imageRegistry,
         String imageTag
 ) {
+
     withCredentials([
             file(
                     credentialsId: 'my-bank-kubeconfig',
                     variable: 'KUBECONFIG'
             )
     ]) {
+
         def values = serviceValuesArgs(services)
 
         def command =
@@ -97,12 +101,14 @@ def helmDeploy(
                         "--create-namespace " +
                         "--atomic " +
                         "--wait " +
+                        "--wait-for-jobs " +
                         "--timeout 30m " +
                         "-f ${valuesFile} " +
                         "${values} " +
                         "-f ${secretsFile} " +
                         "--set global.imageRegistry=${imageRegistry} " +
                         "--set global.imageTag=${imageTag}"
+
 
         runCommand(
                 "${command} --dry-run"
@@ -112,7 +118,30 @@ def helmDeploy(
     }
 }
 
+
+def helmSmokeTest(String namespace) {
+
+    withCredentials([
+            file(
+                    credentialsId: 'my-bank-kubeconfig',
+                    variable: 'KUBECONFIG'
+            )
+    ]) {
+
+        stage('Helm smoke test') {
+
+            runCommand(
+                    "helm test my-bank " +
+                            "--namespace ${namespace} " +
+                            "--logs"
+            )
+        }
+    }
+}
+
+
 def runUmbrellaPipeline() {
+
     def services = [
             [name: 'notification-service', image: 'my-bank-notification-service'],
             [name: 'cash-service', image: 'my-bank-cash-service'],
@@ -125,33 +154,40 @@ def runUmbrellaPipeline() {
             [name: 'api-gateway', image: 'my-bank-api-gateway']
     ]
 
+
     properties([
             parameters([
+
                     string(
                             name: 'IMAGE_REGISTRY',
                             defaultValue: 'registry.example.com/my-bank',
                             description: 'Container registry namespace'
                     ),
+
                     string(
                             name: 'IMAGE_TAG',
                             defaultValue: '',
                             description: 'Image tag. Empty value uses Jenkins BUILD_NUMBER.'
                     ),
+
                     booleanParam(
                             name: 'BUILD_IMAGES',
                             defaultValue: false,
                             description: 'Build all images using Docker'
                     ),
+
                     booleanParam(
                             name: 'PUSH_IMAGES',
                             defaultValue: false,
                             description: 'Build and push all images to registry'
                     ),
+
                     booleanParam(
                             name: 'DEPLOY_TEST',
                             defaultValue: false,
                             description: 'Deploy umbrella chart to test namespace'
                     ),
+
                     booleanParam(
                             name: 'DEPLOY_PROD',
                             defaultValue: false,
@@ -160,50 +196,68 @@ def runUmbrellaPipeline() {
             ])
     ])
 
+
     def imageTag = params.IMAGE_TAG?.trim()
             ? params.IMAGE_TAG.trim()
             : env.BUILD_NUMBER
 
+
     def registryHost = params.IMAGE_REGISTRY.tokenize('/')[0]
 
+
     try {
+
 
         stage('Validate') {
             gradle('projects')
         }
 
+
         stage('Java tests') {
             gradle('test contractTest')
         }
+
 
         stage('bootJar') {
             gradle('clean bootJar')
         }
 
+
         stage('Docker build') {
+
             if (params.BUILD_IMAGES || params.PUSH_IMAGES) {
+
                 services.each { service ->
+
                     runCommand(
                             "docker build " +
                                     "-t ${params.IMAGE_REGISTRY}/${service.image}:${imageTag} " +
                                     "${service.name}"
                     )
                 }
+
             } else {
+
                 echo 'Docker builds skipped by parameter.'
             }
         }
 
+
         stage('Image push') {
+
             if (params.PUSH_IMAGES) {
 
+
                 withCredentials([
+
                         usernamePassword(
                                 credentialsId: 'my-bank-registry-credentials',
                                 usernameVariable: 'REGISTRY_USERNAME',
                                 passwordVariable: 'REGISTRY_PASSWORD'
                         )
+
                 ]) {
+
 
                     runCommand(
                             'printf "%s" "$REGISTRY_PASSWORD" | ' +
@@ -212,7 +266,9 @@ def runUmbrellaPipeline() {
                                     '--password-stdin'
                     )
 
+
                     services.each { service ->
+
                         runCommand(
                                 "docker push " +
                                         "${params.IMAGE_REGISTRY}/${service.image}:${imageTag}"
@@ -220,19 +276,26 @@ def runUmbrellaPipeline() {
                     }
                 }
 
+
             } else {
+
                 echo 'Image push skipped by parameter.'
             }
         }
 
+
         stage('Kubernetes validation') {
+
             if (params.DEPLOY_TEST || params.DEPLOY_PROD) {
 
+
                 withCredentials([
+
                         file(
                                 credentialsId: 'my-bank-kubeconfig',
                                 variable: 'KUBECONFIG'
                         )
+
                 ]) {
 
                     runCommand('kubectl cluster-info')
@@ -240,22 +303,32 @@ def runUmbrellaPipeline() {
                     runCommand('helm version')
                 }
 
+
             } else {
+
                 echo 'Kubernetes validation skipped because deployment is disabled.'
             }
         }
 
+
         stage('Prepare test secrets') {
+
             if (params.DEPLOY_TEST) {
                 decryptSecrets('test')
             }
         }
 
+
         stage('Helm lint and template') {
+
 
             def values = serviceValuesArgs(services)
 
-            runCommand('helm dependency update helm/my-bank')
+
+            runCommand(
+                    'helm dependency update helm/my-bank'
+            )
+
 
             runCommand(
                     "helm lint helm/my-bank " +
@@ -265,6 +338,7 @@ def runUmbrellaPipeline() {
                                     ? "-f envs/runtime/values-secrets-test.yaml"
                                     : "")
             )
+
 
             runCommand(
                     "helm template my-bank helm/my-bank " +
@@ -279,11 +353,16 @@ def runUmbrellaPipeline() {
             )
         }
 
+
+
         stage('Deploy test') {
+
 
             if (params.DEPLOY_TEST) {
 
+
                 createKeycloakRealmSecret('test')
+
 
                 helmDeploy(
                         services,
@@ -294,21 +373,18 @@ def runUmbrellaPipeline() {
                         imageTag
                 )
 
-                withCredentials([
-                        file(
-                                credentialsId: 'my-bank-kubeconfig',
-                                variable: 'KUBECONFIG'
-                        )
-                ]) {
-                    runCommand('helm test my-bank --namespace test')
-                }
 
+                helmSmokeTest('test')
             }
         }
 
+
+
         stage('Manual approval') {
 
+
             if (params.DEPLOY_PROD) {
+
                 input(
                         message: 'Deploy my-bank umbrella release to prod?',
                         ok: 'Deploy'
@@ -316,18 +392,26 @@ def runUmbrellaPipeline() {
             }
         }
 
+
+
         stage('Prepare prod secrets') {
+
 
             if (params.DEPLOY_PROD) {
                 decryptSecrets('prod')
             }
         }
 
+
+
         stage('Deploy prod') {
+
 
             if (params.DEPLOY_PROD) {
 
+
                 createKeycloakRealmSecret('prod')
+
 
                 helmDeploy(
                         services,
@@ -340,13 +424,19 @@ def runUmbrellaPipeline() {
             }
         }
 
+
+
     } finally {
 
+
         stage('Cleanup secrets') {
+
             echo 'Removing decrypted secrets from Jenkins workspace...'
+
             cleanupRuntimeSecrets()
         }
     }
 }
+
 
 return this
