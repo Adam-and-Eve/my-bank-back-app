@@ -479,11 +479,11 @@ helm upgrade --install my-bank . `
 Проверка:
 
 ```bash
-kubectl get pods -n test
+kubectl get pods -n my-bank
 ```
 
 ```bash
-kubectl port-forward -n test svc/my-bank-gateway-nginx 8080:80
+kubectl port-forward -n my-bank svc/my-bank-gateway-nginx 8080:80
 ```
 
 http://localhost:8080
