@@ -179,10 +179,21 @@ envs/secrets/
 ```bash
 KC_BOOTSTRAP_ADMIN_USERNAME=
 KC_BOOTSTRAP_ADMIN_PASSWORD=
+KC_HOSTNAME=http://localhost:8180
+KC_HOSTNAME_STRICT=false
+KC_HTTP_PORT=8080
 
-BANK_KEYCLOAK_REALM_DIRECTORY=./envs/dev/runtime/
+BANK_KEYCLOAK_ISSUER_URI=http://localhost:8180/realms/my-bank-realm
+BANK_KEYCLOAK_JWK_SET_URI=http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+BANK_KEYCLOAK_TOKEN_URI=http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+BANK_KEYCLOAK_USER_INFO_URI=http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/userinfo
+BANK_KEYCLOAK_AUTHORIZATION_URI=http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/auth
+BANK_KEYCLOAK_REDIRECT_URI=http://localhost:8085/login/oauth2/code/{registrationId}
+BANK_KEYCLOAK_END_SESSION_URI=http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout
 
-BANK_PUBLIC_BASE_URL=http://localhost:8080
+BANK_KEYCLOAK_REALM_DIRECTORY=./envs/runtime/
+
+BANK_PUBLIC_BASE_URL=http://localhost:8085
 
 BANK_SERVICES_FRONT_UI_SERVICE_CLIENT_SECRET=
 BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET=
@@ -227,7 +238,7 @@ JENKINS_ADMIN_PASSWORD=
 ### 2. Запуск полной инфраструктуры + всех сервисов
 
 ```bash
-docker compose --profile app up --build -d
+docker compose --profile app --env-file .env.my-bank up --build -d
 ```
 
 ### 3. Проверка статуса
