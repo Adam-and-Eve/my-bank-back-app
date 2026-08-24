@@ -400,7 +400,7 @@ kubectl get pods -n prod
 ```
 
 ```bash
-kubectl port-forward -n test svc/my-bank-gateway-nginx 8080:80
+kubectl port-forward -n prod svc/my-bank-gateway-nginx 8080:80
 ```
 
 http://localhost:8080
@@ -413,6 +413,11 @@ helm uninstall my-bank -n prod
 
 ```bash
 kubectl delete namespace prod
+```
+
+
+```bash
+kind delete cluster
 ```
 
 ---
