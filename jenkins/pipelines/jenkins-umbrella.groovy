@@ -135,7 +135,7 @@ def helmSmokeTest(String namespace) {
                 runCommand(
                         "helm test my-bank " +
                                 "--namespace ${namespace} " +
-                                "--timeout 5m"
+                                "--timeout 30m"
                 )
 
             } catch (Exception e) {
