@@ -196,6 +196,10 @@ def runUmbrellaPipeline() {
                                 passwordVariable: 'REGISTRY_PASSWORD'
                         )
                 ]) {
+                    echo "Registry: ${params.IMAGE_REGISTRY}"
+                    echo "Registry host: ${registryHost}"
+                    echo "Username length: ${REGISTRY_USERNAME.length()}"
+
                     runCommand(
                             "printf '%s' \"\\$REGISTRY_PASSWORD\" | " +
                                     "docker login ${registryHost} " +

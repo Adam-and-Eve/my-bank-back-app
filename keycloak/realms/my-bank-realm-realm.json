@@ -34,11 +34,11 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["${BANK_SERVICES_FRONT_UI_SERVICE_PUBLIC_URL}/login/oauth2/code/*"],
-      "baseUrl": "${BANK_SERVICES_FRONT_UI_SERVICE_PUBLIC_URL}",
-      "webOrigins": ["${BANK_SERVICES_FRONT_UI_SERVICE_PUBLIC_URL}"],
+      "redirectUris": ["${BANK_PUBLIC_BASE_URL}/login/oauth2/code/*"],
+      "baseUrl": "${BANK_PUBLIC_BASE_URL}",
+      "webOrigins": ["${BANK_PUBLIC_BASE_URL}"],
       "attributes": {
-        "post.logout.redirect.uris": "${BANK_SERVICES_FRONT_UI_SERVICE_PUBLIC_URL}/"
+        "post.logout.redirect.uris": "${BANK_PUBLIC_BASE_URL}/"
       },
       "defaultClientScopes": ["web-origins", "role_list", "profile", "email", "roles"],
       "optionalClientScopes": ["address", "phone", "offline_access", "microprofile-jwt"]
