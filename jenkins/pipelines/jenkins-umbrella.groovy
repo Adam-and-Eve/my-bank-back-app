@@ -220,6 +220,23 @@ def runUmbrellaPipeline() {
             }
         }
 
+        stage('Kubernetes validation') {
+            if (params.DEPLOY_TEST || params.DEPLOY_PROD) {
+                withCredentials([
+                        file(
+                                credentialsId: 'my-bank-kubeconfig',
+                                variable: 'KUBECONFIG'
+                        )
+                ]) {
+                    runCommand('kubectl cluster-info')
+                    runCommand('kubectl get nodes')
+                    runCommand('helm version')
+                }
+            } else {
+                echo 'Kubernetes validation skipped because deployment is disabled.'
+            }
+        }
+
         stage('Prepare test secrets') {
             if (params.DEPLOY_TEST) {
                 decryptSecrets('test')
@@ -232,12 +249,6 @@ def runUmbrellaPipeline() {
             def values = serviceValuesArgs(services)
 
             runCommand('helm dependency update helm/my-bank')
-
-            runCommand(
-                    "helm lint helm/my-bank " +
-                            "-f helm/my-bank/values-test.yaml " +
-                            "${values}"
-            )
 
             if (params.DEPLOY_TEST) {
                 runCommand(
@@ -257,6 +268,12 @@ def runUmbrellaPipeline() {
                                 "--set global.imageTag=${imageTag}"
                 )
             } else {
+                runCommand(
+                        "helm lint helm/my-bank " +
+                                "-f helm/my-bank/values-test.yaml " +
+                                "${values}"
+                )
+
                 runCommand(
                         "helm template my-bank helm/my-bank " +
                                 "--namespace test " +
