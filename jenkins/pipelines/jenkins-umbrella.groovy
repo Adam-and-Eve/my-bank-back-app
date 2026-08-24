@@ -130,11 +130,39 @@ def helmSmokeTest(String namespace) {
 
         stage('Helm smoke test') {
 
-            runCommand(
-                    "helm test my-bank " +
-                            "--namespace ${namespace} " +
-                            "--logs"
-            )
+            try {
+
+                runCommand(
+                        "helm test my-bank " +
+                                "--namespace ${namespace} " +
+                                "--timeout 5m"
+                )
+
+            } catch (Exception e) {
+
+                echo 'Helm smoke test failed. Collecting diagnostics...'
+
+                runCommand(
+                        "kubectl get job my-bank-smoke-test " +
+                                "--namespace ${namespace}"
+                )
+
+                runCommand(
+                        "kubectl get pods " +
+                                "--namespace ${namespace} " +
+                                "-l job-name=my-bank-smoke-test"
+                )
+
+                runCommand(
+                        "kubectl logs " +
+                                "--namespace ${namespace} " +
+                                "-l job-name=my-bank-smoke-test " +
+                                "--tail=-1 " +
+                                "--all-containers=true"
+                )
+
+                throw e
+            }
         }
     }
 }
