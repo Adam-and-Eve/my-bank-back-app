@@ -1,6 +1,6 @@
 node {
     checkout scm
-    load('jenkins/jenkins-service.groovy').runServicePipeline(
+    load('jenkins/pipelines/jenkins-service.groovy').runServicePipeline(
         serviceName: 'front-ui-service',
         gradleModule: ':front-ui-service',
         chartPath: 'helm/charts/spring-service',
