@@ -274,7 +274,7 @@ powershell -ExecutionPolicy Bypass `
 ```
 
 После запуска:
-http://localhost:8080
+http://localhost:8090
 
 ---
 
@@ -383,6 +383,18 @@ docker.io/<docker-login>
 `Build`
 
 ---
+
+### 11. Проверить:
+
+```bash
+kubectl get pods -n prod
+```
+
+```bash
+kubectl port-forward -n test svc/my-bank-gateway-nginx 8080:80
+```
+
+http://localhost:8080
 
 # Kubernetes Deployment вручную
 

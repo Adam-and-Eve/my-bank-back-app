@@ -132,4 +132,4 @@ if (Test-Path $Kubeconfig) {
 
 Write-Host ""
 Write-Host "Jenkins started successfully."
-Write-Host "URL: http://localhost:8080"
+Write-Host "URL: http://localhost:8090"
