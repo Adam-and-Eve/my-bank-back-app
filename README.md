@@ -415,9 +415,13 @@ helm uninstall my-bank -n prod
 kubectl delete namespace prod
 ```
 
-
 ```bash
 kind delete cluster
+```
+
+```bash
+powershell -ExecutionPolicy Bypass `
+-File .\jenkins\scripts\stop-jenkins.ps1
 ```
 
 ---
