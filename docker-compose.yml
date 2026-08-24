@@ -126,6 +126,10 @@ x-blocker-service-env: &blocker-service-env
 
   SERVER_PORT: "8088"
 
+x-jenkins-env: &jenkins-env:
+  JENKINS_ADMIN_ID: admin
+  JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD}
+
 
 services:
   postgres:
@@ -339,8 +343,34 @@ services:
         condition: service_healthy
     networks: [ bank-network ]
 
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    image: my-bank-jenkins:${IMAGE_TAG:-local}
+    container_name: jenkins
+
+    profiles:
+      - ci
+      - deploy
+
+    environment:
+      <<: *jenkins-env
+
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+
+    networks:
+      - bank-network
+
 volumes:
   postgres-data:
+  jenkins-data:
 
 networks:
   bank-network:
