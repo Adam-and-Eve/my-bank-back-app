@@ -97,7 +97,7 @@ def helmDeploy(
                         "--create-namespace " +
                         "--atomic " +
                         "--wait " +
-                        "--timeout 5m " +
+                        "--timeout 30m " +
                         "-f ${valuesFile} " +
                         "${values} " +
                         "-f ${secretsFile} " +
