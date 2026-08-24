@@ -111,8 +111,8 @@ public class RestGatewayClientTest {
         var request = new TransferRequestViewModel(
                 "alexey",
                 new BigDecimal("500.00"),
-                "USD",
-                "RUB"
+                "RUB",
+                "USD"
         );
 
         var expectedResponse = new TransferResponseViewModel(
@@ -605,12 +605,12 @@ public class RestGatewayClientTest {
     private void executeCircuitBreakerNormally() {
         when(clientExecutor.execute(any(), any()))
                 .thenAnswer(invocation -> {
-                    var call = invocation.getArgument(0, Supplier.class);
+                    Supplier<?> action = invocation.getArgument(0);
 
                     try {
-                        return call.get();
+                        return action.get();
                     } catch (Throwable exception) {
-                        var fallback = invocation.getArgument(1, Function.class);
+                        Function<Throwable, ?> fallback = invocation.getArgument(1);
 
                         return fallback.apply(exception);
                     }

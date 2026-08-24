@@ -13,25 +13,25 @@ spring:
               filters:
                 - SetStatus=404
             - id: account-service
-              uri:  ${BANK_ACCOUNT_SERVICE_BASE_URL:http://account-service:8081}
+              uri:  ${BANK_SERVICES_ACCOUNT_SERVICE_BASE_URL:http://account-service:8081}
               predicates:
                 - Path=/api/account/**
               filters:
                 - JwtTokenRelay
             - id: cash-service
-              uri: ${BANK_CASH_SERVICE_BASE_URL:http://cash-service:8082}
+              uri: ${BANK_SERVICES_CASH_SERVICE_BASE_URL:http://cash-service:8082}
               predicates:
                 - Path=/api/cash/**
               filters:
                 - JwtTokenRelay
             - id: transfer-service
-              uri: ${BANK_TRANSFER_SERVICE_BASE_URL:http://transfer-service:8083}
+              uri: ${BANK_SERVICES_TRANSFER_SERVICE_BASE_URL:http://transfer-service:8083}
               predicates:
                 - Path=/api/transfer
               filters:
                 - JwtTokenRelay
             - id: exchange-service
-              uri: ${BANK_EXCHANGE_SERVICE_BASE_URL:http://exchange-service:8086}
+              uri: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL:http://exchange-service:8086}
               predicates:
                 - Path=/api/exchange/**
               filters:
