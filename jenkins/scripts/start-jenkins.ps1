@@ -106,7 +106,7 @@ docker run `
     --volume jenkins-data:/var/jenkins_home `
     --volume jenkins-docker-certs:/certs/client:ro `
     --volume "${Kubeconfig}:/var/jenkins_home/.kube/config:ro" `
-    --publish 8080:8080 `
+    --publish 8090:8080 `
     --publish 50000:50000 `
     $JenkinsImage
 
