@@ -1,15 +1,3 @@
-def services = [
-        [name: 'notification-service', image: 'my-bank-notification-service'],
-        [name: 'cash-service', image: 'my-bank-cash-service'],
-        [name: 'blocker-service', image: 'my-bank-blocker-service'],
-        [name: 'transfer-service', image: 'my-bank-transfer-service'],
-        [name: 'exchange-service', image: 'my-bank-exchange-service'],
-        [name: 'exchange-generator-service', image: 'my-bank-exchange-generator-service'],
-        [name: 'account-service', image: 'my-bank-account-service'],
-        [name: 'front-ui-service', image: 'my-bank-front-ui-service'],
-        [name: 'api-gateway', image: 'my-bank-api-gateway']
-]
-
 def runCommand(String linuxCommand, String windowsCommand = null) {
     if (isUnix()) {
         sh linuxCommand
@@ -25,7 +13,7 @@ def gradle(String args) {
     )
 }
 
-def serviceValuesArgs() {
+def serviceValuesArgs(List services) {
     services.collect { service ->
         "-f helm/values/services/${service.name}.yaml"
     }.join(' ')
@@ -83,6 +71,7 @@ def createKeycloakRealmSecret(String namespace) {
 }
 
 def helmDeploy(
+        List services,
         String namespace,
         String valuesFile,
         String secretsFile,
@@ -95,7 +84,7 @@ def helmDeploy(
                     variable: 'KUBECONFIG'
             )
     ]) {
-        def values = serviceValuesArgs()
+        def values = serviceValuesArgs(services)
 
         def command =
                 "helm upgrade --install my-bank helm/my-bank " +
@@ -118,6 +107,18 @@ def helmDeploy(
 }
 
 def runUmbrellaPipeline() {
+    def services = [
+            [name: 'notification-service', image: 'my-bank-notification-service'],
+            [name: 'cash-service', image: 'my-bank-cash-service'],
+            [name: 'blocker-service', image: 'my-bank-blocker-service'],
+            [name: 'transfer-service', image: 'my-bank-transfer-service'],
+            [name: 'exchange-service', image: 'my-bank-exchange-service'],
+            [name: 'exchange-generator-service', image: 'my-bank-exchange-generator-service'],
+            [name: 'account-service', image: 'my-bank-account-service'],
+            [name: 'front-ui-service', image: 'my-bank-front-ui-service'],
+            [name: 'api-gateway', image: 'my-bank-api-gateway']
+    ]
+
     properties([
             parameters([
                     string(
@@ -228,7 +229,7 @@ def runUmbrellaPipeline() {
         }
 
         stage('Helm lint and template') {
-            def values = serviceValuesArgs()
+            def values = serviceValuesArgs(services)
 
             runCommand('helm dependency update helm/my-bank')
 
@@ -272,6 +273,7 @@ def runUmbrellaPipeline() {
                 createKeycloakRealmSecret('test')
 
                 helmDeploy(
+                        services,
                         'test',
                         'helm/my-bank/values-test.yaml',
                         'envs/runtime/values-secrets-test.yaml',
@@ -316,6 +318,7 @@ def runUmbrellaPipeline() {
                 createKeycloakRealmSecret('prod')
 
                 helmDeploy(
+                        services,
                         'prod',
                         'helm/my-bank/values-prod.yaml',
                         'envs/runtime/values-secrets-prod.yaml',
