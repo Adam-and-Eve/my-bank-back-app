@@ -19,7 +19,8 @@ metadata:
     "helm.sh/hook-delete-policy": before-hook-creation
 
 spec:
-  backoffLimit: 1
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 300
 
   template:
     metadata:
@@ -43,34 +44,44 @@ spec:
               echo "Starting smoke tests..."
 
 
-              expect_status() {
+              wait_for_status() {
                 url="$1"
                 expected="$2"
 
-                actual="$(curl \
-                  --silent \
-                  --show-error \
-                  --output /dev/null \
-                  --write-out '%{http_code}' \
-                  --connect-timeout 5 \
-                  --max-time 10 \
-                  "$url")"
+                attempts=30
 
-                if [ "$actual" != "$expected" ]; then
-                  echo "FAILED: $url expected=$expected actual=$actual"
-                  exit 1
-                fi
+                while [ $attempts -gt 0 ]; do
 
-                echo "OK: $url -> $actual"
+                  actual="$(curl \
+                    --silent \
+                    --show-error \
+                    --output /dev/null \
+                    --write-out '%{http_code}' \
+                    --connect-timeout 2 \
+                    --max-time 5 \
+                    "$url" || true)"
+
+                  if [ "$actual" = "$expected" ]; then
+                    echo "READY: $url -> $actual"
+                    return 0
+                  fi
+
+                  echo "WAIT: $url expected=$expected actual=$actual"
+
+                  attempts=$((attempts-1))
+                  sleep 5
+                done
+
+                echo "FAILED: $url expected=$expected"
+                exit 1
               }
 
 
               echo "Checking Keycloak..."
 
-
               {{- if $keycloak.enabled }}
 
-              expect_status \
+              wait_for_status \
                 "http://{{ default "keycloak" $keycloak.fullnameOverride }}:{{ default 8080 $keycloak.service.port }}/realms/my-bank-realm/.well-known/openid-configuration" \
                 "200"
 
@@ -79,10 +90,9 @@ spec:
 
               echo "Checking frontend..."
 
-
               {{- if $frontUiService.enabled }}
 
-              expect_status \
+              wait_for_status \
                 "http://{{ default "front-ui-service" $frontUiService.fullnameOverride }}:{{ default 8085 $frontUiService.service.port }}/" \
                 "302"
 
@@ -91,10 +101,9 @@ spec:
 
               echo "Checking account-service..."
 
-
               {{- if $accountService.enabled }}
 
-              expect_status \
+              wait_for_status \
                 "http://{{ default "account-service" $accountService.fullnameOverride }}:{{ default 8081 $accountService.service.port }}/api/account/me" \
                 "401"
 
@@ -103,10 +112,9 @@ spec:
 
               echo "Checking cash-service..."
 
-
               {{- if $cashService.enabled }}
 
-              expect_status \
+              wait_for_status \
                 "http://{{ default "cash-service" $cashService.fullnameOverride }}:{{ default 8082 $cashService.service.port }}/api/cash/deposit" \
                 "401"
 
@@ -115,10 +123,9 @@ spec:
 
               echo "Checking transfer-service..."
 
-
               {{- if $transferService.enabled }}
 
-              expect_status \
+              wait_for_status \
                 "http://{{ default "transfer-service" $transferService.fullnameOverride }}:{{ default 8083 $transferService.service.port }}/api/transfer" \
                 "401"
 
@@ -127,10 +134,9 @@ spec:
 
               echo "Checking exchange-service..."
 
-
               {{- if $exchangeService.enabled }}
 
-              expect_status \
+              wait_for_status \
                 "http://{{ default "exchange-service" $exchangeService.fullnameOverride }}:{{ default 8086 $exchangeService.service.port }}/api/exchange/rates" \
                 "200"
 
