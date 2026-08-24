@@ -201,10 +201,10 @@ def runUmbrellaPipeline() {
                     echo "Username length: ${REGISTRY_USERNAME.length()}"
 
                     runCommand(
-                            "printf '%s' \"\\$REGISTRY_PASSWORD\" | " +
+                            'printf "%s" "$REGISTRY_PASSWORD" | ' +
                                     "docker login ${registryHost} " +
-                                    "--username \"\\$REGISTRY_USERNAME\" " +
-                                    "--password-stdin",
+                                    '--username "$REGISTRY_USERNAME" ' +
+                                    '--password-stdin',
 
                             "echo %REGISTRY_PASSWORD%| " +
                                     "docker login ${registryHost} " +
