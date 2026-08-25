@@ -159,7 +159,7 @@ envs/secrets/
 │
 ├── values-secrets-dev.enc.yaml
 ├── values-secrets-test.enc.yaml
-├── values-secrets-dev.enc.yaml
+├── values-secrets-prod.enc.yaml
 └── my-bank-realm-realm.enc.json
 ```
 
