@@ -107,11 +107,11 @@ powershell -ExecutionPolicy Bypass -File .\kubernetes\scripts\kind-bootstrap.ps1
 
 ```bash
 ├── charts/
-│   ├── main/
-│   │   ├── keycloak
-│   │   ├── postgresql
-│   │   └── spring-service
-│   └── my-bank
+│   ├── keycloak
+│   ├── postgresql
+│   ├── postgresql
+│   └── spring-service
+├── my-bank
 │
 └── values
       └── services
