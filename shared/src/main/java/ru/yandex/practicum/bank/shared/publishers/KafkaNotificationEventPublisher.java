@@ -60,8 +60,6 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
     @Override
     public void publish(NotificationEventModel event) {
         try {
-            // В качестве ключа сообщения используется логин получателя (recipientLogin),
-            // чтобы гарантировать порядок обработки уведомлений для одного пользователя.
             kafkaTemplate.send(topic, event.recipientLogin(), event)
                     .whenComplete((result, exception) -> {
                         if (exception != null) {
