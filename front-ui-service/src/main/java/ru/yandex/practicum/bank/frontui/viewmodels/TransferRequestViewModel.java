@@ -11,6 +11,7 @@ import java.math.BigDecimal;
 public record TransferRequestViewModel (
         String recipientLogin,
         BigDecimal amount,
-        String currency
+        String currency,
+        String targetCurrency
 ) {
 }

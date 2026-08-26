@@ -5,6 +5,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.gateway.route.RouteDefinitionLocator;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -27,15 +29,55 @@ public class GatewaySecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет, что внутренний эндпоинт аккаунтов заблокирован:
-     * перехватывает путь /api/account/internal/**, имеет целевой URI no://op и возвращает статус 404 (SetStatus).
+     * Проверяет, что backend-маршруты корректно направляют запросы на соответствующие сервисы
+     * и содержат фильтр JwtTokenRelay.
      * </summary>
      **/
     @Test
-    void shouldBlockInternalAccountApiWithStatus404() {
+    void shouldRouteBackendRequestsToServiceDnsTargetsWithTokenRelay() {
         var routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
 
         assertThat(routes).isNotNull();
+
+        Map<String, String> expectedUris = Map.of(
+                "account-service", "http://account-service:8081",
+                "cash-service", "http://cash-service:8082",
+                "transfer-service", "http://transfer-service:8083",
+                "exchange-service", "http://exchange-service:8086"
+        );
+
+        expectedUris.forEach((routeId, uri) -> assertThat(routes)
+                .filteredOn(route -> routeId.equals(route.getId()))
+                .singleElement()
+                .satisfies(route -> {
+                    assertThat(route.getUri().toString()).isEqualTo(uri);
+                    assertThat(route.getUri().getScheme()).isEqualTo("http");
+                    assertThat(route.getFilters())
+                            .anySatisfy(filter ->
+                                    assertThat(filter.getName()).isEqualTo("JwtTokenRelay"));
+                }));
+    }
+
+    /**
+     * <summary>
+     * Проверяет, что маршрут transfer-service использует точный путь /api/transfer
+     * без wildcard-варианта и что внутренний API аккаунтов заблокирован,
+     * имеет целевой URI no://op и возвращает статус 404.
+     * </summary>
+     **/
+    @Test
+    void shouldKeepTransferRouteExactAndBlockAccountInternalApi() {
+        var routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
+
+        assertThat(routes).isNotNull();
+
+        assertThat(routes)
+                .filteredOn(route -> "transfer-service".equals(route.getId()))
+                .singleElement()
+                .satisfies(route -> assertThat(route.getPredicates())
+                        .anySatisfy(predicate -> assertThat(predicate.getArgs())
+                                .containsValue("/api/transfer")
+                                .doesNotContainValue("/api/transfer/**")));
 
         assertThat(routes)
                 .filteredOn(route -> "block-account-internal-api".equals(route.getId()))
@@ -46,86 +88,8 @@ public class GatewaySecurityConfigurationTest {
                             .anySatisfy(predicate -> assertThat(predicate.getArgs())
                                     .containsValue("/api/account/internal/**"));
                     assertThat(route.getFilters())
-                            .anySatisfy(filter -> assertThat(filter.getName()).isEqualTo("SetStatus"));
-                });
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что маршрут для account-service корректно сконфигурирован:
-     * направляет трафик на lb://account-service, обрабатывает путь /api/account/**
-     * и содержит фильтр JwtTokenRelay.
-     * </summary>
-     **/
-    @Test
-    void shouldRouteAccountToAccountServiceWithTokenRelay() {
-        var routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
-
-        assertThat(routes).isNotNull();
-
-        assertThat(routes)
-                .filteredOn(route -> "account-service".equals(route.getId()))
-                .singleElement()
-                .satisfies(route -> {
-                    assertThat(route.getUri().toString()).isEqualTo("lb://account-service");
-                    assertThat(route.getPredicates())
-                            .anySatisfy(predicate -> assertThat(predicate.getArgs())
-                                    .containsValue("/api/account/**"));
-                    assertThat(route.getFilters())
-                            .anySatisfy(filter -> assertThat(filter.getName()).isEqualTo("JwtTokenRelay"));
-                });
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что маршрут для cash-service корректно сконфигурирован:
-     * направляет трафик на lb://cash-service, обрабатывает путь /api/cash/**
-     * и содержит фильтр JwtTokenRelay.
-     * </summary>
-     **/
-    @Test
-    void shouldRouteCashToCashServiceWithTokenRelay() {
-        var routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
-
-        assertThat(routes).isNotNull();
-
-        assertThat(routes)
-                .filteredOn(route -> "cash-service".equals(route.getId()))
-                .singleElement()
-                .satisfies(route -> {
-                    assertThat(route.getUri().toString()).isEqualTo("lb://cash-service");
-                    assertThat(route.getPredicates())
-                            .anySatisfy(predicate -> assertThat(predicate.getArgs())
-                                    .containsValue("/api/cash/**"));
-                    assertThat(route.getFilters())
-                            .anySatisfy(filter -> assertThat(filter.getName()).isEqualTo("JwtTokenRelay"));
-                });
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что маршрут для transfer-service корректно сконфигурирован:
-     * направляет трафик на lb://transfer-service, перехватывает точный путь /api/transfer
-     * и содержит фильтр JwtTokenRelay.
-     * </summary>
-     **/
-    @Test
-    void shouldRouteTransfersToTransferServiceWithTokenRelay() {
-        var routes = routeDefinitionLocator.getRouteDefinitions().collectList().block();
-
-        assertThat(routes).isNotNull();
-
-        assertThat(routes)
-                .filteredOn(route -> "transfer-service".equals(route.getId()))
-                .singleElement()
-                .satisfies(route -> {
-                    assertThat(route.getUri().toString()).isEqualTo("lb://transfer-service");
-                    assertThat(route.getPredicates())
-                            .anySatisfy(predicate -> assertThat(predicate.getArgs())
-                                    .containsValue("/api/transfer")
-                                    .doesNotContainValue("/api/transfer/**"));
-                    assertThat(route.getFilters())
-                            .anySatisfy(filter -> assertThat(filter.getName()).isEqualTo("JwtTokenRelay"));
+                            .anySatisfy(filter ->
+                                    assertThat(filter.getName()).isEqualTo("SetStatus"));
                 });
     }
 

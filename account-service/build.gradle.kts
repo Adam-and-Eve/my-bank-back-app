@@ -9,6 +9,7 @@ contracts {
 }
 
 dependencies {
+    implementation(project(":shared"))
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.boot.starter.validation)
@@ -16,9 +17,6 @@ dependencies {
     implementation(libs.spring.boot.starter.aop)
     implementation(libs.spring.boot.starter.oauth2.resource.server)
     implementation(libs.spring.retry)
-
-    implementation(libs.spring.cloud.starter.config)
-    implementation(libs.spring.cloud.starter.netflix.eureka.client)
 
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.database.postgresql)

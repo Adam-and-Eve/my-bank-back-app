@@ -1,6 +1,7 @@
 package ru.yandex.practicum.bank.frontui.interfaces;
 
 import ru.yandex.practicum.bank.frontui.viewmodels.*;
+import ru.yandex.practicum.bank.shared.viewmodels.ExchangeRateResponseViewModel;
 
 import java.util.List;
 
@@ -15,61 +16,76 @@ public interface GatewayClient {
 
     /**
      * <summary>
-     * Выполняет перевод денежных средств между счетами.
+     * Выполняет перевод денежных средств через API Gateway с использованием CircuitBreaker.
      * </summary>
-     * @param accessToken OAuth2 Access Token пользователя.
-     * @param form Данные формы перевода.
+     * @param accessToken Bearer токен аутентификации.
+     * @param form Форма перевода денежных средств.
      * @return Результат выполнения перевода.
      **/
     public TransferResponseViewModel transfer(String accessToken, TransferFormViewModel form);
 
     /**
      * <summary>
-     * Запрашивает информацию о текущем аккаунте пользователя.
+     * Получает данные текущего счета через API Gateway с использованием CircuitBreaker.
      * </summary>
-     * @param accessToken OAuth2 Access Token пользователя.
-     * @return Информация об аккаунте.
+     * @param accessToken Bearer токен аутентификации.
+     * @return Данные текущего счета.
      **/
     public AccountResponseViewModel getAccount(String accessToken);
 
     /**
      * <summary>
-     * Обновляет профиль аккаунта пользователя.
+     * Получает текущие курсы валют через API Gateway с использованием CircuitBreaker.
      * </summary>
-     * @param accessToken OAuth2 Access Token пользователя.
-     * @param form Форма с новыми данными профиля.
-     * @return Обновленная информация об аккаунте.
+     * @param accessToken Bearer токен аутентификации.
+     * @return Список текущих курсов валют.
      **/
-    public AccountResponseViewModel updateAccount(String accessToken, AccountFormViewModel form);
+    public List<ExchangeRateResponseViewModel> getExchangeRates(String accessToken);
 
     /**
      * <summary>
-     * Запрашивает список доступных получателей переводов.
+     * Обновляет данные текущего счета через API Gateway с использованием CircuitBreaker.
      * </summary>
-     * @param accessToken OAuth2 Access Token пользователя.
-     * @return Список получателей.
+     * @param accessToken Bearer токен аутентификации.
+     * @param form Форма с обновляемыми данными счета.
+     * @return Обновленные данные счета.
+     **/
+    public AccountResponseViewModel updateAccount(
+            String accessToken,
+            AccountFormViewModel form);
+
+    /**
+     * <summary>
+     * Получает список получателей через API Gateway с использованием CircuitBreaker.
+     * </summary>
+     * @param accessToken Bearer токен аутентификации.
+     * @return Список доступных получателей.
      **/
     public List<RecipientResponseViewModel> getRecipients(String accessToken);
 
     /**
      * <summary>
-     * Выполняет операцию внесения наличных на счет (депозит).
+     * Выполняет депозит через API Gateway с использованием CircuitBreaker.
      * </summary>
-     * @param accessToken OAuth2 Access Token пользователя.
-     * @param form Форма внесения наличных.
-     * @return Результат кассовой операции.
+     * @param accessToken Bearer токен аутентификации.
+     * @param form Форма кассовой операции.
+     * @return Результат выполнения депозита.
      **/
-    public CashOperationResponseViewModel deposit(String accessToken, CashFormViewModel form);
+    public CashOperationResponseViewModel deposit(
+            String accessToken,
+            CashFormViewModel form);
 
     /**
      * <summary>
-     * Выполняет операцию снятия наличных со счета.
+     * Выполняет снятие денежных средств через API Gateway с использованием CircuitBreaker.
      * </summary>
-     * @param accessToken OAuth2 Access Token пользователя.
-     * @param form Форма снятия наличных.
-     * @return Результат кассовой операции.
+     * @param accessToken Bearer токен аутентификации.
+     * @param form Форма кассовой операции.
+     * @return Результат выполнения снятия денежных средств.
      **/
-    public CashOperationResponseViewModel withdraw(String accessToken, CashFormViewModel form);
+    public CashOperationResponseViewModel withdraw(
+            String accessToken,
+            CashFormViewModel form);
 
     // endregion
 }

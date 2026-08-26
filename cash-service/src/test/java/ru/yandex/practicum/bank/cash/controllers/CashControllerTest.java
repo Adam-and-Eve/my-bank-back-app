@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.bank.cash.exceptions.MissingPreferredUsernameException;
+import ru.yandex.practicum.bank.cash.exceptions.OperationBlockedException;
 import ru.yandex.practicum.bank.cash.interfaces.CashService;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
 
@@ -178,6 +179,64 @@ public class CashControllerTest {
                         .content(VALID_REQUEST_BODY))
                 .andExpect(result -> assertThat(result.getResolvedException())
                         .isInstanceOf(MissingPreferredUsernameException.class));
+    }
+
+    /**
+     * <summary>
+     * Проверяет возврат ошибки 422 Unprocessable Entity, если операция
+     * заблокирована сервисом проверки подозрительных операций.
+     * </summary>
+     **/
+    @Test
+    public void shouldReturnUnprocessableEntityWhenOperationIsBlocked() throws Exception {
+        var exception = new OperationBlockedException("Подозрительная операция");
+
+        when(cashService.deposit(eq(TEST_USER), any()))
+                .thenThrow(exception);
+
+        mockMvc.perform(post(DEPOSIT_URL)
+                        .with(jwt()
+                                .jwt(token -> token.claim("preferred_username", TEST_USER))
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER"),
+                                        new SimpleGrantedAuthority("ROLE_CASH_WRITE")
+                                ))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_REQUEST_BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("OPERATION_BLOCKED"))
+                .andExpect(jsonPath("$.message").value("Подозрительная операция"));
+
+        verify(cashService).deposit(eq(TEST_USER), any());
+    }
+
+    /**
+     * <summary>
+     * Проверяет возврат ошибки 422 Unprocessable Entity, если операция снятия
+     * заблокирована сервисом проверки подозрительных операций.
+     * </summary>
+     **/
+    @Test
+    public void shouldReturnUnprocessableEntityWhenWithdrawOperationIsBlocked() throws Exception {
+        var exception = new OperationBlockedException("Снятие средств заблокировано");
+
+        when(cashService.withdraw(eq(TEST_USER), any()))
+                .thenThrow(exception);
+
+        mockMvc.perform(post(WITHDRAW_URL)
+                        .with(jwt()
+                                .jwt(token -> token.claim("preferred_username", TEST_USER))
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_USER"),
+                                        new SimpleGrantedAuthority("ROLE_CASH_WRITE")
+                                ))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_REQUEST_BODY))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("OPERATION_BLOCKED"))
+                .andExpect(jsonPath("$.message").value("Снятие средств заблокировано"));
+
+        verify(cashService).withdraw(eq(TEST_USER), any());
     }
 
     // endregion

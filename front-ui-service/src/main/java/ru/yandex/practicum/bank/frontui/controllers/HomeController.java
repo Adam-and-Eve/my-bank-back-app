@@ -63,7 +63,10 @@ public class HomeController {
      * </summary>
      **/
     @GetMapping("/")
-    public String showMainPage(Model model, Principal principal, Authentication authentication) {
+    public String showMainPage(
+            Model model,
+            Principal principal,
+            Authentication authentication) {
         modelFactory.populateMainPageModel(model, principal, authentication);
 
         return "index";
@@ -137,7 +140,7 @@ public class HomeController {
         try {
             var accessToken = securityUserContext.getAccessToken(authentication);
 
-            CashOperationResponseViewModel response = switch (action) {
+            var response = switch (action) {
                 case "deposit" -> gatewayClient.deposit(accessToken, cashForm);
                 case "withdraw" -> gatewayClient.withdraw(accessToken, cashForm);
                 default -> throw new GatewayClientException("Unknown cash action: " + action);
@@ -146,6 +149,8 @@ public class HomeController {
             redirectAttributes.addFlashAttribute("successMessage", response.message());
         } catch (GatewayClientException exception) {
             redirectAttributes.addFlashAttribute("errorMessage", exception.getMessage());
+
+            redirectAttributes.addFlashAttribute("cashForm", cashForm);
         }
 
         return "redirect:/";
@@ -186,6 +191,8 @@ public class HomeController {
             redirectAttributes.addFlashAttribute("transferResponse", response);
         } catch (GatewayClientException exception) {
             redirectAttributes.addFlashAttribute("errorMessage", exception.getMessage());
+
+            redirectAttributes.addFlashAttribute("transferForm", transferForm);
         }
 
         return "redirect:/";

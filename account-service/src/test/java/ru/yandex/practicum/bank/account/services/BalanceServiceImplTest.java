@@ -8,11 +8,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.yandex.practicum.bank.account.interfaces.BalanceOperationService;
 import ru.yandex.practicum.bank.account.interfaces.IdempotencyService;
-import ru.yandex.practicum.bank.account.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.account.viewmodels.BalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.BalanceResponseViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.TransferBalanceRequestViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.TransferBalanceResponseViewModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
 import java.util.function.Supplier;

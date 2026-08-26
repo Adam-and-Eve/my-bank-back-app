@@ -1,0 +1,13 @@
+exchange-service:
+  enabled: true
+
+  fullnameOverride: exchange-service
+
+  image:
+    repository: my-bank-exchange-service
+
+  service:
+    port: 8086
+
+  env:
+    SERVER_PORT: "8086"

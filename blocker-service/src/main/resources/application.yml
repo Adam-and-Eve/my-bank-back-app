@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: blocker-service
+  jackson:
+    default-property-inclusion: non_null
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${BANK_KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/my-bank-realm}
+          jwk-set-uri: ${BANK_KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/certs}
+bank:
+  services:
+    blocker-service:
+        max-amount: ${BANK_SERVICES_BLOCKER_SERVICE_MAX_AMOUNT:100000.00}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+server:
+  port: 8088

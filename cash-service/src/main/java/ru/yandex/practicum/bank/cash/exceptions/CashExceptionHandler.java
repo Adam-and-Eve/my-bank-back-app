@@ -5,6 +5,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import ru.yandex.practicum.bank.shared.exceptions.BlockerClientException;
 import ru.yandex.practicum.bank.shared.exceptions.NotificationClientException;
 import ru.yandex.practicum.bank.shared.viewmodels.ApiErrorResponseViewModel;
 
@@ -95,6 +96,21 @@ public class CashExceptionHandler {
 
     /**
      * <summary>
+     * Обрабатывает исключение блокировки операции подозрительным или запрещённым сервисом блокировки.
+     * </summary>
+     * @param exception Исключение OperationBlockedException.
+     * <return>
+     * @return Модель ошибки ApiErrorResponseViewModel с кодом OPERATION_BLOCKED и статусом 422 Unprocessable Entity.
+     * </return>
+     **/
+    @ExceptionHandler(OperationBlockedException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public ApiErrorResponseViewModel handleOperationBlocked(OperationBlockedException exception) {
+        return new ApiErrorResponseViewModel("OPERATION_BLOCKED", exception.getMessage());
+    }
+
+    /**
+     * <summary>
      * Обрабатывает ошибки взаимодействия с внешним сервисом уведомлений (Notifications Service).
      * </summary>
      * @param exception Исключение NotificationClientException.
@@ -106,5 +122,20 @@ public class CashExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_GATEWAY)
     public ApiErrorResponseViewModel handleNotificationsClient(NotificationClientException exception) {
         return new ApiErrorResponseViewModel("NOTIFICATION_SERVICE_UNAVAILABLE", exception.getMessage());
+    }
+
+    /**
+     * <summary>
+     * Обрабатывает ошибки взаимодействия с внешним сервисом блокировки операций (Blocker Service).
+     * </summary>
+     * @param exception Исключение BlockerClientException.
+     * <return>
+     * @return Модель ошибки ApiErrorResponseViewModel с кодом BLOCKER_SERVICE_UNAVAILABLE и статусом 502 Bad Gateway.
+     * </return>
+     **/
+    @ExceptionHandler(BlockerClientException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ApiErrorResponseViewModel handleBlockerClient(BlockerClientException exception) {
+        return new ApiErrorResponseViewModel("BLOCKER_SERVICE_UNAVAILABLE", exception.getMessage());
     }
 }

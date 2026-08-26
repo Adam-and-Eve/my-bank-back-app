@@ -1,0 +1,41 @@
+global:
+  namespace: my-bank
+  imageRegistry: ""
+  imageTag: local
+  publicBaseUrl: http://localhost:8080
+  keycloakInternalUrl: http://keycloak:8080/realms/my-bank-realm
+  keycloakPublicUrl: http://localhost:8080/realms/my-bank-realm
+  postgresql:
+    host: postgresql
+    port: 5432
+    database: my-bank
+    username: postgres
+  env:
+    SPRING_JACKSON_DEFAULTPROPERTYINCLUSION: non_null
+    BANK_PUBLIC_BASE_URL: http://localhost:8080
+    BANK_KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/my-bank-realm
+    BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
+    BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+
+gatewayApi:
+  enabled: true
+  gatewayClassName: nginx
+  listener:
+    name: http
+    port: 80
+    hostname: ""
+
+keycloak:
+  enabled: true
+  fullnameOverride: keycloak
+  extraEnv:
+    - name: KC_HOSTNAME
+      value: http://localhost:8080
+    - name: KC_HOSTNAME_STRICT
+      value: "false"
+  realmImport:
+    frontUiPublicUrl: http://localhost:8080
+
+postgresql:
+  enabled: true
+  fullnameOverride: postgresql

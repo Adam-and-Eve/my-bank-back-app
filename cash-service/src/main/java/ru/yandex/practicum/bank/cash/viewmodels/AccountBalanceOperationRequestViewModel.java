@@ -1,6 +1,6 @@
 package ru.yandex.practicum.bank.cash.viewmodels;
 
-import ru.yandex.practicum.bank.cash.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
 

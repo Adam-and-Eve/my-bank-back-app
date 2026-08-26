@@ -2,6 +2,7 @@ package ru.yandex.practicum.bank.frontui.configurations;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -11,6 +12,7 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 
@@ -46,9 +48,6 @@ public class FrontSecurityConfigurationTest {
 
     private static final String PROTECTED_URL = "/protected-test";
 
-    private static final String END_SESSION_URI =
-            "http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/logout";
-
     private static final String ID_TOKEN = "test-id-token";
 
     // endregion
@@ -57,6 +56,12 @@ public class FrontSecurityConfigurationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Value("${bank.public-base-url}")
+    private URI publicBaseUrl;
+
+    @Value("${bank.security.logout.end-session-uri}")
+    private URI endSessionUri;
 
     // endregion
 
@@ -73,7 +78,9 @@ public class FrontSecurityConfigurationTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string(
                         "Location",
-                        org.hamcrest.Matchers.containsString("/oauth2/authorization/")
+                        org.hamcrest.Matchers.containsString(
+                                "/oauth2/authorization/front-ui-service"
+                        )
                 ));
     }
 
@@ -125,7 +132,9 @@ public class FrontSecurityConfigurationTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string(
                         "Location",
-                        org.hamcrest.Matchers.containsString("/oauth2/authorization/")
+                        org.hamcrest.Matchers.containsString(
+                                "/oauth2/authorization/front-ui-service"
+                        )
                 ));
     }
 
@@ -147,7 +156,9 @@ public class FrontSecurityConfigurationTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string(
                         "Location",
-                        org.hamcrest.Matchers.containsString(END_SESSION_URI)
+                        org.hamcrest.Matchers.containsString(
+                                endSessionUri.toString()
+                        )
                 ));
     }
 
@@ -166,7 +177,7 @@ public class FrontSecurityConfigurationTest {
                 .andExpect(header().string(
                         "Location",
                         org.hamcrest.Matchers.containsString(
-                                "post_logout_redirect_uri=http"
+                                "post_logout_redirect_uri="
                         )
                 ));
     }
@@ -231,8 +242,11 @@ public class FrontSecurityConfigurationTest {
         var location = result.getResponse().getHeader("Location");
 
         assertThat(location).isNotNull();
-        assertThat(location).contains(END_SESSION_URI);
+
+        assertThat(location).contains(endSessionUri.toString());
+
         assertThat(location).contains("post_logout_redirect_uri");
+
         assertThat(location).doesNotContain("id_token_hint");
     }
 
@@ -244,9 +258,20 @@ public class FrontSecurityConfigurationTest {
      **/
     @Test
     public void shouldHandleLogoutWithoutAuthentication() throws Exception {
-        mockMvc.perform(post(LOGOUT_URL)
+        var result = mockMvc.perform(post(LOGOUT_URL)
                         .with(SecurityMockMvcRequestPostProcessors.csrf()))
-                .andExpect(status().is3xxRedirection());
+                .andExpect(status().is3xxRedirection())
+                .andReturn();
+
+        var location = result.getResponse().getHeader("Location");
+
+        assertThat(location).isNotNull();
+
+        assertThat(location).contains(endSessionUri.toString());
+
+        assertThat(location).contains("post_logout_redirect_uri");
+
+        assertThat(location).doesNotContain("id_token_hint");
     }
 
     // endregion

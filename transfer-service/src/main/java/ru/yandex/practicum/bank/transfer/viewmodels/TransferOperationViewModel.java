@@ -1,6 +1,6 @@
 package ru.yandex.practicum.bank.transfer.viewmodels;
 
-import ru.yandex.practicum.bank.transfer.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
 
@@ -19,6 +19,17 @@ public record TransferOperationViewModel (
         String recipientLogin,
         BigDecimal amount,
         CurrencyEnumModel currency,
+        BigDecimal recipientAmount,
+        CurrencyEnumModel recipientCurrency,
         String operationId
 ) {
+    public TransferOperationViewModel(
+            String senderLogin,
+            String recipientLogin,
+            BigDecimal amount,
+            CurrencyEnumModel currency,
+            String operationId
+    ) {
+        this(senderLogin, recipientLogin, amount, currency, amount, currency, operationId);
+    }
 }

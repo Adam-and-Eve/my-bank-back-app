@@ -1,0 +1,52 @@
+replicaCount: 1
+
+image:
+  repository: quay.io/keycloak/keycloak
+  tag: 26.6.3
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8080
+
+admin:
+  existingSecret: keycloak-credentials
+  usernameKey: admin-username
+  passwordKey: admin-password
+
+realmImport:
+  enabled: true
+  existingSecret: keycloak-realm
+  key: my-bank-realm-realm.json
+  frontUiPublicUrl: http://localhost:8080
+  secretEnv:
+    - name: BANK_SERVICES_FRONT_UI_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_FRONT_UI_SERVICE_CLIENT_SECRET
+
+    - name: BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET
+
+    - name: BANK_SERVICES_CASH_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_CASH_SERVICE_CLIENT_SECRET
+
+    - name: BANK_SERVICES_TRANSFER_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_TRANSFER_SERVICE_CLIENT_SECRET
+
+    - name: BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET
+
+    - name: BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET
+      secretName: my-bank-service-credentials
+      key: BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET
+
+extraEnv:
+  - name: KC_HOSTNAME
+    value: http://localhost:8080
+  - name: KC_HOSTNAME_STRICT
+    value: "false"
+
+resources: {}

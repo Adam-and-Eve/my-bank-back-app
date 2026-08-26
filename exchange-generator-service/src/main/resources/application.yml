@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: exchange-generator-service
+  jackson:
+    default-property-inclusion: non_null
+  security:
+    oauth2:
+      client:
+        registration:
+          exchange-generator-service:
+            provider: keycloak
+            authorization-grant-type: client_credentials
+            client-id: exchange-generator-service
+            client-secret: ${BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET:}
+        provider:
+          keycloak:
+            token-uri: ${BANK_KEYCLOAK_TOKEN_URI:http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/token}
+
+bank:
+  services:
+    blocker-service:
+      base-url: ${BANK_SERVICES_BLOCKER_SERVICE_BASE_URL:http://blocker-service}
+    exchange-service:
+      base-url: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL:http://exchange-service}
+    exchange-generator-service:
+      fixed-delay-ms: ${BANK_SERVICES_EXCHANGE_GENERATOR_SERVICES_FIXED_DELAY_MS:1000}
+    notification-service:
+      base-url: ${BANK_SERVICES_NOTIFICATION_SERVICE_BASE_URL:http://notification-service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: 8087

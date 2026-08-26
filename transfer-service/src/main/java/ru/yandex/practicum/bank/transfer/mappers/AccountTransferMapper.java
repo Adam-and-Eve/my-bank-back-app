@@ -16,19 +16,22 @@ public class AccountTransferMapper {
 
     /**
      * <summary>
-     * Преобразует общую модель операции перевода TransferOperationViewModel в DTO запроса для сервиса счетов.
+     * Преобразует модель выполняемой операции перевода в модель запроса,
+     * предназначенную для отправки в сервис счетов.
      * </summary>
-     * @param operation Данные о выполняемой операции перевода.
-     * <return>
-     * @return Экземпляр DTO AccountTransferRequestViewModel.
-     * </return>
+     * @param operation Модель выполняемой операции перевода.
+     * @return Модель HTTP-запроса для сервиса счетов.
      **/
-    public AccountTransferRequestViewModel toAccountRequest(TransferOperationViewModel operation) {
+    public AccountTransferRequestViewModel toAccountRequest(
+            TransferOperationViewModel operation) {
+
         return new AccountTransferRequestViewModel(
                 operation.senderLogin(),
                 operation.recipientLogin(),
                 operation.amount(),
                 operation.currency(),
+                operation.recipientAmount(),
+                operation.recipientCurrency(),
                 operation.operationId()
         );
     }

@@ -1,0 +1,10 @@
+node {
+    checkout scm
+    load('jenkins/pipelines/jenkins-service.groovy').runServicePipeline(
+        serviceName: 'notification-service',
+        gradleModule: ':notification-service',
+        chartPath: 'helm/charts/spring-service',
+        valuesPath: 'helm/values/services/notification-service.yaml',
+        imageRepository: 'my-bank-notification-service'
+    )
+}

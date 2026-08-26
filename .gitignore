@@ -6,6 +6,12 @@ build/
 !**/src/test/**/build/
 .kotlin
 
+### Helm ###
+helm/my-bank/charts/*.tgz
+
+### PS ###
+jenkins/scripts/jenkins-kubeconfig.yaml
+
 ### IntelliJ IDEA ###
 .idea/
 *.iws

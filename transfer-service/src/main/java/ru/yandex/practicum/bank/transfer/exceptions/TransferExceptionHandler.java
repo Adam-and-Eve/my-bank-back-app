@@ -5,6 +5,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import ru.yandex.practicum.bank.shared.exceptions.BlockerClientException;
+import ru.yandex.practicum.bank.shared.exceptions.ExchangeClientException;
 import ru.yandex.practicum.bank.shared.exceptions.NotificationClientException;
 import ru.yandex.practicum.bank.shared.viewmodels.ApiErrorResponseViewModel;
 
@@ -65,6 +67,21 @@ public class TransferExceptionHandler {
 
     /**
      * <summary>
+     * Обрабатывает исключение блокировки операции сервисом проверки подозрительных операций.
+     * </summary>
+     * @param exception Исключение OperationBlockedException.
+     * <return>
+     * @return DTO ответа об ошибке с кодом OPERATION_BLOCKED и HTTP-статусом 422 Unprocessable Entity.
+     * </return>
+     **/
+    @ExceptionHandler(OperationBlockedException.class)
+    @ResponseStatus(HttpStatus.UNPROCESSABLE_ENTITY)
+    public ApiErrorResponseViewModel handleOperationBlocked(OperationBlockedException exception) {
+        return new ApiErrorResponseViewModel("OPERATION_BLOCKED", exception.getMessage());
+    }
+
+    /**
+     * <summary>
      * Обрабатывает ошибки валидации аргументов входящих DTO-запросов.
      * </summary>
      * @param exception Исключение MethodArgumentNotValidException.
@@ -121,5 +138,31 @@ public class TransferExceptionHandler {
     @ResponseStatus(HttpStatus.BAD_GATEWAY)
     public ApiErrorResponseViewModel handleNotificationsClient(NotificationClientException exception) {
         return new ApiErrorResponseViewModel("NOTIFICATION_SERVICE_UNAVAILABLE", exception.getMessage());
+    }
+
+    /**
+     * <summary>
+     * Обрабатывает исключения сбоев при вызове сервиса блокировки операций (Blocker Service).
+     * </summary>
+     * @param exception Исключение BlockerClientException.
+     * @return DTO ответа об ошибке с кодом BLOCKER_SERVICE_UNAVAILABLE и HTTP-статусом 502 Bad Gateway.
+     **/
+    @ExceptionHandler(BlockerClientException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ApiErrorResponseViewModel handleBlockerClient(BlockerClientException exception) {
+        return new ApiErrorResponseViewModel("BLOCKER_SERVICE_UNAVAILABLE", exception.getMessage());
+    }
+
+    /**
+     * <summary>
+     * Обрабатывает исключения сбоев при вызове сервиса конвертации валют (Exchange Service).
+     * </summary>
+     * @param exception Исключение ExchangeClientException.
+     * @return DTO ответа об ошибке с кодом EXCHANGE_SERVICE_UNAVAILABLE и HTTP-статусом 502 Bad Gateway.
+     **/
+    @ExceptionHandler(ExchangeClientException.class)
+    @ResponseStatus(HttpStatus.BAD_GATEWAY)
+    public ApiErrorResponseViewModel handleExchangeClient(ExchangeClientException exception) {
+        return new ApiErrorResponseViewModel("EXCHANGE_SERVICE_UNAVAILABLE", exception.getMessage());
     }
 }

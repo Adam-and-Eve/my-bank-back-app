@@ -1,14 +1,20 @@
 spring:
-  cloud:
-    config:
-      enabled: false
+  application:
+    name: notifications-service
+  jackson:
+    default-property-inclusion: non_null
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8180/realms/my-bank-realm
-          jwk-set-uri: http://localhost:8180/realms/my-bank-realm/protocol/openid-connect/certs
+          issuer-uri: ${BANK_KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/my-bank-realm}
+          jwk-set-uri: ${BANK_KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/certs}
 
-eureka:
-  client:
-    enabled: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+server:
+  port: 8084

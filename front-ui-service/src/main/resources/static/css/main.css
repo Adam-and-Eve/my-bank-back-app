@@ -688,3 +688,60 @@ footer {
         gap: 7px;
     }
 }
+
+/* --------------------------------
+   RATES TABLE
+   -------------------------------- */
+
+.rates-table {
+    display: grid;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.rates-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    min-height: 44px;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    border-top: 1px solid var(--border);
+}
+
+.rates-row:first-child {
+    border-top: 0;
+}
+
+.rates-head {
+    background: rgba(182, 255, 0, 0.04);
+    color: var(--muted);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+.rates-row strong {
+    color: var(--green);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+}
+
+.rates-row span {
+    color: var(--text);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 13px;
+}
+
+.empty-state {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}

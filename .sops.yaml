@@ -1,0 +1,12 @@
+creation_rules:
+  - path_regex: .*values-secrets-dev(\.enc)?\.ya?ml$
+    age: age1yxaztnh2jc4740e33fcxa8gy996a959f2548xucplkss4k483p6ss8jryg
+
+  - path_regex: .*values-secrets-test(\.enc)?\.ya?ml$
+    age: age1yxaztnh2jc4740e33fcxa8gy996a959f2548xucplkss4k483p6ss8jryg
+
+  - path_regex: .*values-secrets-prod(\.enc)?\.ya?ml$
+    age: age1yxaztnh2jc4740e33fcxa8gy996a959f2548xucplkss4k483p6ss8jryg
+
+  - path_regex: .*my-bank-realm-realm(\.enc)?\.json$
+    age: age1yxaztnh2jc4740e33fcxa8gy996a959f2548xucplkss4k483p6ss8jryg

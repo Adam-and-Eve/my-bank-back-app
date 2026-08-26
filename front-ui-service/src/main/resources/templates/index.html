@@ -109,6 +109,8 @@
                                th:name="${_csrf.parameterName}"
                                th:value="${_csrf.token}">
 
+                        <input type="hidden" th:field="*{idempotencyKey}">
+
                         <label>
                             Сумма
                             <input type="number"
@@ -137,7 +139,40 @@
                 <article class="panel wide">
                     <div class="panel-header">
                         <div>
-                            <span class="panel-code">03 / ДЕНЕЖНЫЕ ПЕРЕВОДЫ</span>
+                            <span class="panel-code">03 / КУРСЫ ВАЛЮТ</span>
+                            <h2>Курсы валют</h2>
+                        </div>
+                        <span class="panel-icon">¤</span>
+                    </div>
+
+                    <p class="inline-error"
+                       th:if="${exchangeRatesLoadError}"
+                       th:text="${exchangeRatesLoadError}">
+                    </p>
+
+                    <div class="empty-state"
+                         th:if="${#lists.isEmpty(exchangeRates) and exchangeRatesLoadError == null}">
+                        Курсы валют пока не загружены
+                    </div>
+
+                    <div class="rates-table" th:if="${!#lists.isEmpty(exchangeRates)}">
+                        <div class="rates-row rates-head">
+                            <span>Валюта</span>
+                            <span>Покупка</span>
+                            <span>Продажа</span>
+                        </div>
+                        <div class="rates-row" th:each="rate : ${exchangeRates}">
+                            <strong th:text="${rate.currency()}">USD</strong>
+                            <span th:text="${rate.buyRate()}">90.0000</span>
+                            <span th:text="${rate.sellRate()}">92.0000</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="panel wide">
+                    <div class="panel-header">
+                        <div>
+                            <span class="panel-code">04 / ДЕНЕЖНЫЕ ПЕРЕВОДЫ</span>
                             <h2>Переводы</h2>
                         </div>
                         <span class="panel-icon">↗</span>
@@ -163,15 +198,17 @@
                                th:name="${_csrf.parameterName}"
                                th:value="${_csrf.token}">
 
+                        <input type="hidden" th:field="*{sourceCurrency}">
+                        <input type="hidden" th:field="*{idempotencyKey}">
+
                         <label>
                             Получатель
                             <select th:field="*{recipientLogin}">
                                 <option value="">Выберите получателя</option>
-
                                 <option th:each="recipient : ${recipients}"
                                         th:value="${recipient.login()}"
                                         th:text="${recipient.name() + ' (' + recipient.login() + ')'}">
-                                    Петр
+                                    Анна
                                 </option>
                             </select>
                         </label>
@@ -188,6 +225,8 @@
                             Валюта
                             <select th:field="*{currency}">
                                 <option value="RUB">RUB</option>
+                                <option value="USD">USD</option>
+                                <option value="CNY">CNY</option>
                             </select>
                         </label>
 
@@ -203,7 +242,7 @@
 
                     <div class="result" th:if="${transferResponse}">
                         <span>ПОЛУЧАТЕЛЬ</span>
-                        <strong th:text="${transferResponse.recipientLogin()}">petr</strong>
+                        <strong th:text="${transferResponse.recipientLogin()}">anna</strong>
 
                         <span>ОСТАТОК</span>
                         <strong>

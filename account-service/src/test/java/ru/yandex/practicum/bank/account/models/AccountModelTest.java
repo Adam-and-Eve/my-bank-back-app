@@ -1,6 +1,7 @@
 package ru.yandex.practicum.bank.account.models;
 
 import org.junit.jupiter.api.Test;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

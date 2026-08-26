@@ -14,13 +14,18 @@ public class GatewayRequestMapper {
 
     /**
      * <summary>
-     * Преобразует форму перевода в DTO запроса к API.
+     * Преобразует форму перевода в DTO запроса к API Gateway.
      * </summary>
-     * @param form Форма перевода средств.
+     * @param form Форма перевода денежных средств.
      * @return DTO запроса перевода.
      **/
     public TransferRequestViewModel toTransferRequest(TransferFormViewModel form) {
-        return new TransferRequestViewModel(form.recipientLogin(), form.amount(), form.currency());
+        return new TransferRequestViewModel(
+                form.recipientLogin(),
+                form.amount(),
+                form.sourceCurrency(),
+                form.currency()
+        );
     }
 
     /**
