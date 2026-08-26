@@ -3,6 +3,8 @@ package ru.yandex.practicum.bank.cash.interfaces;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
 
+import java.util.UUID;
+
 /**
  * <summary>
  * Контракт сервиса операций с наличностью (Cash Service).
@@ -23,7 +25,7 @@ public interface CashService {
      * @return Модель ответа CashOperationResponseViewModel с обновленным балансом и статусом.
      * </return>
      **/
-    public CashOperationResponseViewModel deposit(String login, CashOperationRequestViewModel request);
+    public CashOperationResponseViewModel deposit(String login, CashOperationRequestViewModel request, UUID operationId);
 
     /**
      * <summary>
@@ -36,7 +38,7 @@ public interface CashService {
      * @return Модель ответа CashOperationResponseViewModel с обновленным балансом и статусом.
      * </return>
      **/
-    public CashOperationResponseViewModel withdraw(String login, CashOperationRequestViewModel request);
+    public CashOperationResponseViewModel withdraw(String login, CashOperationRequestViewModel request, UUID operationId);
 
     // endregion
 }

@@ -201,7 +201,7 @@ public class NotificationTopicsProperties implements InitializingBean {
      * Устанавливает количество партиций для DLT-топика уведомлений.
      * </summary>
      */
-    public void setNotificationsDltPartitions(int notificationDltPartitions) {
+    public void setNotificationDltPartitions(int notificationDltPartitions) {
         this.notificationDltPartitions = notificationDltPartitions;
     }
 

@@ -1,4 +1,18 @@
 spring:
+  kafka:
+    admin:
+      fail-fast: false
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all
+      retries: 2147483647
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        "[enable.idempotence]": true
+        "[delivery.timeout.ms]": 120000
+        "[request.timeout.ms]": 30000
+        "[max.in.flight.requests.per.connection]": 5
   security:
     oauth2:
       client:
@@ -17,6 +31,13 @@ spring:
           jwk-set-uri: http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/certs
 
 bank:
+  kafka:
+    notification-dlt-topic: bank.notification.dlt
+    notification-dlt-partitions: 3
+    notification-dlt-retention-ms: 604800000
+    notification-partitions: 3
+    notification-replication-factor: 1
+    notification-topic: bank.notification
   services:
     account-service:
       base-url: http://account-service
@@ -24,5 +45,3 @@ bank:
       base-url: http://blocker-service
     exchange-service:
       base-url: http://exchange-service
-    notification-service:
-      base-url: http://notification-service

@@ -4,6 +4,8 @@ import org.springframework.stereotype.Component;
 import ru.yandex.practicum.bank.cash.viewmodels.AccountBalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 
+import java.util.UUID;
+
 /**
  * <summary>
  * Маппер для преобразования входных моделей запросов операций с наличностью
@@ -30,13 +32,13 @@ public class AccountBalanceMapper {
     public AccountBalanceOperationRequestViewModel toAccountsRequest(
             String login,
             CashOperationRequestViewModel request,
-            String operationId
+            UUID operationId
     ) {
         return new AccountBalanceOperationRequestViewModel(
                 login,
                 request.amount(),
                 request.currency(),
-                operationId
+                operationId.toString()
         );
     }
 

@@ -10,6 +10,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import ru.yandex.practicum.bank.cash.exceptions.AccountClientException;
@@ -73,13 +74,10 @@ public class HttpAccountClientTest {
 
         objectMapper = new ObjectMapper();
 
-        var circuitBreaker = SimpleCircuitBreaker.withDefaults("accountService");
-
         accountClient = new HttpAccountClient(
                 restClientBuilder,
                 BASE_URL,
                 serviceTokenProvider,
-                circuitBreaker,
                 objectMapper
         );
     }
@@ -105,7 +103,7 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(DEPOSIT_URI))
+        mockServer.expect(ExpectedCount.once(), requestTo(DEPOSIT_URI))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + TEST_TOKEN))
                 .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
@@ -117,11 +115,8 @@ public class HttpAccountClientTest {
         mockServer.verify();
 
         assertThat(result).isNotNull();
-
         assertThat(result.login()).isEqualTo("alexey");
-
-        assertThat(result.balance()).isEqualTo(new BigDecimal("1500.00"));
-
+        assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("1500.00"));
         assertThat(result.currency()).isEqualTo("RUB");
     }
 
@@ -142,7 +137,7 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(WITHDRAW_URI))
+        mockServer.expect(ExpectedCount.once(), requestTo(WITHDRAW_URI))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + TEST_TOKEN))
                 .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
@@ -154,11 +149,8 @@ public class HttpAccountClientTest {
         mockServer.verify();
 
         assertThat(result).isNotNull();
-
         assertThat(result.login()).isEqualTo("alexey");
-
-        assertThat(result.balance()).isEqualTo(new BigDecimal("1000.00"));
-
+        assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("1000.00"));
         assertThat(result.currency()).isEqualTo("RUB");
     }
 
@@ -178,7 +170,8 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(WITHDRAW_URI))
+        // Для 400 ошибок Retry обычно не срабатывает, но на всякий случай разрешаем несколько вызовов
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(WITHDRAW_URI))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST)
                         .body(errorResponseJson)
                         .contentType(MediaType.APPLICATION_JSON));
@@ -206,7 +199,8 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(DEPOSIT_URI))
+        // ExpectedCount.manyTimes() критически важен здесь из-за механизма Retry для 500 ошибок
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(DEPOSIT_URI))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(errorResponseJson)
                         .contentType(MediaType.APPLICATION_JSON));
@@ -227,7 +221,8 @@ public class HttpAccountClientTest {
     public void shouldFallbackToDefaultMessageWhenResponseBodyIsMalformedJson() {
         when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
 
-        mockServer.expect(requestTo(DEPOSIT_URI))
+        // ExpectedCount.manyTimes() критически важен здесь из-за механизма Retry для 500 ошибок
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(DEPOSIT_URI))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Internal Server Error (Html or plain text)")
                         .contentType(MediaType.TEXT_PLAIN));
@@ -248,7 +243,8 @@ public class HttpAccountClientTest {
     public void shouldHandleNetworkFailure() {
         when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
 
-        mockServer.expect(requestTo(DEPOSIT_URI))
+        // ExpectedCount.manyTimes() критически важен здесь из-за механизма Retry для IOException
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(DEPOSIT_URI))
                 .andRespond(withException(new IOException("Connection refused")));
 
         var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-128");

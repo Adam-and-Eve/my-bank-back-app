@@ -1,10 +1,10 @@
 package ru.yandex.practicum.bank.cash.services;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.yandex.practicum.bank.cash.exceptions.InvalidAmountException;
@@ -17,15 +17,21 @@ import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
 import ru.yandex.practicum.bank.shared.interfaces.BlockerClient;
 import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
-import ru.yandex.practicum.bank.shared.interfaces.NotificationClient;
+import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
+import ru.yandex.practicum.bank.shared.models.NotificationSourceEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationTypeEnumModel;
 import ru.yandex.practicum.bank.shared.models.OperationTypeEnumModel;
 import ru.yandex.practicum.bank.shared.viewmodels.ConversionResponseViewModel;
-import ru.yandex.practicum.bank.shared.viewmodels.NotificationRequestViewModel;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckResponseViewModel;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,7 +48,7 @@ import static org.mockito.Mockito.when;
  * Модульные тесты для реализации сервиса CashServiceImpl.
  * Проверяют бизнес-логику пополнения и снятия средств, валидацию входящих сумм,
  * проверку операций через Blocker Service, конвертацию валют через Exchange Service,
- * корректное преобразование данных маппером и передачу operationId между сервисами.
+ * корректное преобразование данных маппером и отправку уведомлений в Kafka.
  * </summary>
  **/
 @ExtendWith(MockitoExtension.class)
@@ -51,8 +57,9 @@ public class CashServiceImplTest {
     // region Constants
 
     private static final String TEST_LOGIN = "alexey";
-
     private static final String CURRENCY = "RUB";
+    private static final UUID TEST_OPERATION_ID = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-08-27T12:00:00Z");
 
     // endregion
 
@@ -68,13 +75,32 @@ public class CashServiceImplTest {
     private ExchangeClient exchangeClient;
 
     @Mock
-    private NotificationClient notificationClient;
+    private NotificationEventPublisher notificationEventPublisher;
 
     @Mock
     private AccountBalanceMapper accountBalanceMapper;
 
-    @InjectMocks
+    private Clock clock;
+
     private CashServiceImpl cashService;
+
+    // endregion
+
+    // region Setup
+
+    @BeforeEach
+    public void setUp() {
+        clock = Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC"));
+
+        cashService = new CashServiceImpl(
+                accountClient,
+                blockerClient,
+                exchangeClient,
+                notificationEventPublisher,
+                accountBalanceMapper,
+                clock
+        );
+    }
 
     // endregion
 
@@ -90,104 +116,65 @@ public class CashServiceImplTest {
     public void shouldDepositSuccessfully() {
         var amount = new BigDecimal("500.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.RUB
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.RUB);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(true, null));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         var balanceResponse = mock(AccountBalanceResponseViewModel.class);
 
-        when(balanceResponse.balance())
-                .thenReturn(new BigDecimal("1500.00"));
+        when(balanceResponse.balance()).thenReturn(new BigDecimal("1500.00"));
 
-        when(balanceResponse.currency())
-                .thenReturn(CURRENCY);
+        when(balanceResponse.currency()).thenReturn(CURRENCY);
 
-        when(accountClient.deposit(any()))
-                .thenReturn(balanceResponse);
+        when(accountClient.deposit(any())).thenReturn(balanceResponse);
 
-        var response = cashService.deposit(TEST_LOGIN, request);
+        var response = cashService.deposit(TEST_LOGIN, request, TEST_OPERATION_ID);
 
-        assertThat(response)
-                .isEqualTo(new CashOperationResponseViewModel(
-                        new BigDecimal("1500.00"),
-                        CURRENCY,
-                        "Счёт пополнен"
-                ));
+        assertThat(response).isEqualTo(new CashOperationResponseViewModel(
+                new BigDecimal("1500.00"),
+                CURRENCY,
+                "Счёт пополнен"
+        ));
 
         verifyNoInteractions(exchangeClient);
 
-        var blockerCaptor =
-                ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
+        var blockerCaptor = ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
 
         verify(blockerClient).check(blockerCaptor.capture());
 
         var blockerRequest = blockerCaptor.getValue();
 
-        assertThat(blockerRequest.operationId())
-                .isNotBlank();
+        assertThat(blockerRequest.operationId()).isEqualTo(TEST_OPERATION_ID.toString());
 
-        assertThat(blockerRequest.operationType())
-                .isEqualTo(OperationTypeEnumModel.DEPOSIT);
+        assertThat(blockerRequest.operationType()).isEqualTo(OperationTypeEnumModel.DEPOSIT);
 
-        assertThat(blockerRequest.login())
-                .isEqualTo(TEST_LOGIN);
+        assertThat(blockerRequest.login()).isEqualTo(TEST_LOGIN);
 
-        assertThat(blockerRequest.sender())
-                .isNull();
+        assertThat(blockerRequest.amount()).isEqualByComparingTo(amount);
 
-        assertThat(blockerRequest.recipient())
-                .isNull();
+        assertThat(blockerRequest.currency()).isEqualTo(CurrencyEnumModel.RUB);
 
-        assertThat(blockerRequest.amount())
-                .isEqualByComparingTo(amount);
+        verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID));
 
-        assertThat(blockerRequest.currency())
-                .isEqualTo(CurrencyEnumModel.RUB);
+        var notificationCaptor = ArgumentCaptor.forClass(NotificationEventModel.class);
 
-        assertThat(blockerRequest.normalizedAmount())
-                .isEqualByComparingTo(amount);
-
-        assertThat(blockerRequest.baseCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        var operationId = blockerRequest.operationId();
-
-        var operationIdCaptor =
-                ArgumentCaptor.forClass(String.class);
-
-        verify(accountBalanceMapper)
-                .toAccountsRequest(
-                        eq(TEST_LOGIN),
-                        eq(request),
-                        operationIdCaptor.capture()
-                );
-
-        assertThat(operationIdCaptor.getValue())
-                .isEqualTo(operationId);
-
-        var notificationCaptor =
-                ArgumentCaptor.forClass(NotificationRequestViewModel.class);
-
-        verify(notificationClient)
-                .notify(notificationCaptor.capture());
+        verify(notificationEventPublisher).publish(notificationCaptor.capture());
 
         var notification = notificationCaptor.getValue();
 
-        assertThat(notification.recipientLogin())
-                .isEqualTo(TEST_LOGIN);
+        assertThat(notification.recipientLogin()).isEqualTo(TEST_LOGIN);
 
-        assertThat(notification.type())
-                .isEqualTo("CASH_DEPOSIT");
+        assertThat(notification.type()).isEqualTo(NotificationTypeEnumModel.CASH_DEPOSITED);
 
-        assertThat(notification.message())
-                .isEqualTo("Счёт пополнен на 500.00 RUB");
+        assertThat(notification.source()).isEqualTo(NotificationSourceEnumModel.CASH);
 
-        assertThat(notification.operationId())
-                .isEqualTo(operationId);
+        assertThat(notification.message()).isEqualTo("Счёт пополнен на 500.00 RUB");
+
+        assertThat(notification.operationId()).isEqualTo(TEST_OPERATION_ID);
+
+        assertThat(notification.amount()).isEqualByComparingTo(amount);
+
+        assertThat(notification.currency()).isEqualTo(CurrencyEnumModel.RUB);
     }
 
     /**
@@ -200,104 +187,55 @@ public class CashServiceImplTest {
     public void shouldWithdrawSuccessfully() {
         var amount = new BigDecimal("200.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.RUB
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.RUB);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(true, null));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         var balanceResponse = mock(AccountBalanceResponseViewModel.class);
 
-        when(balanceResponse.balance())
-                .thenReturn(new BigDecimal("800.00"));
+        when(balanceResponse.balance()).thenReturn(new BigDecimal("800.00"));
 
-        when(balanceResponse.currency())
-                .thenReturn(CURRENCY);
+        when(balanceResponse.currency()).thenReturn(CURRENCY);
 
-        when(accountClient.withdraw(any()))
-                .thenReturn(balanceResponse);
+        when(accountClient.withdraw(any())).thenReturn(balanceResponse);
 
-        var response = cashService.withdraw(TEST_LOGIN, request);
+        var response = cashService.withdraw(TEST_LOGIN, request, TEST_OPERATION_ID);
 
-        assertThat(response)
-                .isEqualTo(new CashOperationResponseViewModel(
-                        new BigDecimal("800.00"),
-                        CURRENCY,
-                        "Деньги сняты со счёта"
-                ));
+        assertThat(response).isEqualTo(new CashOperationResponseViewModel(
+                new BigDecimal("800.00"),
+                CURRENCY,
+                "Деньги сняты со счёта"
+        ));
 
         verifyNoInteractions(exchangeClient);
 
-        var blockerCaptor =
-                ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
+        var blockerCaptor = ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
 
         verify(blockerClient).check(blockerCaptor.capture());
 
         var blockerRequest = blockerCaptor.getValue();
 
-        assertThat(blockerRequest.operationId())
-                .isNotBlank();
+        assertThat(blockerRequest.operationId()).isEqualTo(TEST_OPERATION_ID.toString());
 
-        assertThat(blockerRequest.operationType())
-                .isEqualTo(OperationTypeEnumModel.WITHDRAW);
+        assertThat(blockerRequest.operationType()).isEqualTo(OperationTypeEnumModel.WITHDRAW);
 
-        assertThat(blockerRequest.login())
-                .isEqualTo(TEST_LOGIN);
+        verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID));
 
-        assertThat(blockerRequest.sender())
-                .isNull();
+        var notificationCaptor = ArgumentCaptor.forClass(NotificationEventModel.class);
 
-        assertThat(blockerRequest.recipient())
-                .isNull();
-
-        assertThat(blockerRequest.amount())
-                .isEqualByComparingTo(amount);
-
-        assertThat(blockerRequest.currency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        assertThat(blockerRequest.normalizedAmount())
-                .isEqualByComparingTo(amount);
-
-        assertThat(blockerRequest.baseCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        var operationId = blockerRequest.operationId();
-
-        var operationIdCaptor =
-                ArgumentCaptor.forClass(String.class);
-
-        verify(accountBalanceMapper)
-                .toAccountsRequest(
-                        eq(TEST_LOGIN),
-                        eq(request),
-                        operationIdCaptor.capture()
-                );
-
-        assertThat(operationIdCaptor.getValue())
-                .isEqualTo(operationId);
-
-        var notificationCaptor =
-                ArgumentCaptor.forClass(NotificationRequestViewModel.class);
-
-        verify(notificationClient)
-                .notify(notificationCaptor.capture());
+        verify(notificationEventPublisher).publish(notificationCaptor.capture());
 
         var notification = notificationCaptor.getValue();
 
-        assertThat(notification.recipientLogin())
-                .isEqualTo(TEST_LOGIN);
+        assertThat(notification.recipientLogin()).isEqualTo(TEST_LOGIN);
 
-        assertThat(notification.type())
-                .isEqualTo("CASH_WITHDRAW");
+        assertThat(notification.type()).isEqualTo(NotificationTypeEnumModel.CASH_WITHDRAWN);
 
-        assertThat(notification.message())
-                .isEqualTo("Со счёта снято 200.00 RUB");
+        assertThat(notification.source()).isEqualTo(NotificationSourceEnumModel.CASH);
 
-        assertThat(notification.operationId())
-                .isEqualTo(operationId);
+        assertThat(notification.message()).isEqualTo("Со счёта снято 200.00 RUB");
+
+        assertThat(notification.operationId()).isEqualTo(TEST_OPERATION_ID);
     }
 
     /**
@@ -309,64 +247,44 @@ public class CashServiceImplTest {
     @Test
     public void shouldNormalizeForeignCurrencyDepositAmountBeforeBlockerCheck() {
         var amount = new BigDecimal("100.00");
+
         var normalizedAmount = new BigDecimal("9500.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.USD
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.USD);
 
         var conversion = mock(ConversionResponseViewModel.class);
 
-        when(conversion.targetAmount())
-                .thenReturn(normalizedAmount);
+        when(conversion.targetAmount()).thenReturn(normalizedAmount);
 
-        when(exchangeClient.convert(
-                CurrencyEnumModel.USD,
-                CurrencyEnumModel.RUB,
-                amount
-        )).thenReturn(conversion);
+        when(exchangeClient.convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount)).thenReturn(conversion);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(true, null));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         var balanceResponse = mock(AccountBalanceResponseViewModel.class);
 
-        when(balanceResponse.balance())
-                .thenReturn(new BigDecimal("15000.00"));
+        when(balanceResponse.balance()).thenReturn(new BigDecimal("15000.00"));
 
-        when(balanceResponse.currency())
-                .thenReturn(CURRENCY);
+        when(balanceResponse.currency()).thenReturn(CURRENCY);
 
-        when(accountClient.deposit(any()))
-                .thenReturn(balanceResponse);
+        when(accountClient.deposit(any())).thenReturn(balanceResponse);
 
-        cashService.deposit(TEST_LOGIN, request);
+        cashService.deposit(TEST_LOGIN, request, TEST_OPERATION_ID);
 
-        var captor =
-                ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
+        var captor = ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
 
         verify(blockerClient).check(captor.capture());
 
         var blockerRequest = captor.getValue();
 
-        assertThat(blockerRequest.amount())
-                .isEqualByComparingTo(amount);
+        assertThat(blockerRequest.amount()).isEqualByComparingTo(amount);
 
-        assertThat(blockerRequest.currency())
-                .isEqualTo(CurrencyEnumModel.USD);
+        assertThat(blockerRequest.currency()).isEqualTo(CurrencyEnumModel.USD);
 
-        assertThat(blockerRequest.normalizedAmount())
-                .isEqualByComparingTo(normalizedAmount);
+        assertThat(blockerRequest.normalizedAmount()).isEqualByComparingTo(normalizedAmount);
 
-        assertThat(blockerRequest.baseCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(blockerRequest.baseCurrency()).isEqualTo(CurrencyEnumModel.RUB);
 
-        verify(exchangeClient).convert(
-                CurrencyEnumModel.USD,
-                CurrencyEnumModel.RUB,
-                amount
-        );
+        verify(exchangeClient).convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount);
     }
 
     /**
@@ -378,64 +296,38 @@ public class CashServiceImplTest {
     @Test
     public void shouldNormalizeForeignCurrencyWithdrawAmountBeforeBlockerCheck() {
         var amount = new BigDecimal("200.00");
+
         var normalizedAmount = new BigDecimal("19000.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.USD
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.USD);
 
         var conversion = mock(ConversionResponseViewModel.class);
 
-        when(conversion.targetAmount())
-                .thenReturn(normalizedAmount);
+        when(conversion.targetAmount()).thenReturn(normalizedAmount);
 
-        when(exchangeClient.convert(
-                CurrencyEnumModel.USD,
-                CurrencyEnumModel.RUB,
-                amount
-        )).thenReturn(conversion);
+        when(exchangeClient.convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount)).thenReturn(conversion);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(true, null));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         var balanceResponse = mock(AccountBalanceResponseViewModel.class);
 
-        when(balanceResponse.balance())
-                .thenReturn(new BigDecimal("5000.00"));
+        when(balanceResponse.balance()).thenReturn(new BigDecimal("5000.00"));
 
-        when(balanceResponse.currency())
-                .thenReturn(CURRENCY);
+        when(balanceResponse.currency()).thenReturn(CURRENCY);
 
-        when(accountClient.withdraw(any()))
-                .thenReturn(balanceResponse);
+        when(accountClient.withdraw(any())).thenReturn(balanceResponse);
 
-        cashService.withdraw(TEST_LOGIN, request);
+        cashService.withdraw(TEST_LOGIN, request, TEST_OPERATION_ID);
 
-        var captor =
-                ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
+        var captor = ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
 
         verify(blockerClient).check(captor.capture());
 
         var blockerRequest = captor.getValue();
 
-        assertThat(blockerRequest.amount())
-                .isEqualByComparingTo(amount);
+        assertThat(blockerRequest.normalizedAmount()).isEqualByComparingTo(normalizedAmount);
 
-        assertThat(blockerRequest.currency())
-                .isEqualTo(CurrencyEnumModel.USD);
-
-        assertThat(blockerRequest.normalizedAmount())
-                .isEqualByComparingTo(normalizedAmount);
-
-        assertThat(blockerRequest.baseCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        verify(exchangeClient).convert(
-                CurrencyEnumModel.USD,
-                CurrencyEnumModel.RUB,
-                amount
-        );
+        verify(exchangeClient).convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount);
     }
 
     /**
@@ -447,70 +339,46 @@ public class CashServiceImplTest {
     @Test
     public void shouldCheckAndNormalizeOperationBeforeChangingBalance() {
         var amount = new BigDecimal("100.00");
+
         var normalizedAmount = new BigDecimal("9500.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.USD
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.USD);
 
         var conversion = mock(ConversionResponseViewModel.class);
 
-        when(conversion.targetAmount())
-                .thenReturn(normalizedAmount);
+        when(conversion.targetAmount()).thenReturn(normalizedAmount);
 
-        when(exchangeClient.convert(
-                CurrencyEnumModel.USD,
-                CurrencyEnumModel.RUB,
-                amount
-        )).thenReturn(conversion);
+        when(exchangeClient.convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount)).thenReturn(conversion);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(true, null));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         var balanceResponse = mock(AccountBalanceResponseViewModel.class);
 
-        when(balanceResponse.balance())
-                .thenReturn(new BigDecimal("10000.00"));
+        when(balanceResponse.balance()).thenReturn(new BigDecimal("10000.00"));
 
-        when(balanceResponse.currency())
-                .thenReturn(CURRENCY);
+        when(balanceResponse.currency()).thenReturn(CURRENCY);
 
-        when(accountClient.deposit(any()))
-                .thenReturn(balanceResponse);
+        when(accountClient.deposit(any())).thenReturn(balanceResponse);
 
-        cashService.deposit(TEST_LOGIN, request);
+        cashService.deposit(TEST_LOGIN, request, TEST_OPERATION_ID);
 
         InOrder inOrder = inOrder(
                 exchangeClient,
                 blockerClient,
                 accountBalanceMapper,
                 accountClient,
-                notificationClient
+                notificationEventPublisher
         );
 
-        inOrder.verify(exchangeClient)
-                .convert(
-                        CurrencyEnumModel.USD,
-                        CurrencyEnumModel.RUB,
-                        amount
-                );
+        inOrder.verify(exchangeClient).convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount);
 
-        inOrder.verify(blockerClient)
-                .check(any(OperationCheckRequestViewModel.class));
+        inOrder.verify(blockerClient).check(any(OperationCheckRequestViewModel.class));
 
-        inOrder.verify(accountBalanceMapper)
-                .toAccountsRequest(
-                        eq(TEST_LOGIN),
-                        eq(request),
-                        any(String.class)
-                );
+        inOrder.verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID));
 
-        inOrder.verify(accountClient)
-                .deposit(any());
+        inOrder.verify(accountClient).deposit(any());
 
-        inOrder.verify(notificationClient)
-                .notify(any(NotificationRequestViewModel.class));
+        inOrder.verify(notificationEventPublisher).publish(any(NotificationEventModel.class));
     }
 
     /**
@@ -521,31 +389,17 @@ public class CashServiceImplTest {
      **/
     @Test
     public void shouldThrowOperationBlockedExceptionWhenDepositIsBlocked() {
-        var request = new CashOperationRequestViewModel(
-                new BigDecimal("500.00"),
-                CurrencyEnumModel.RUB
-        );
+        var request = new CashOperationRequestViewModel(new BigDecimal("500.00"), CurrencyEnumModel.RUB);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(
-                        false,
-                        "Подозрительная операция"
-                ));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(false, "Подозрительная операция"));
 
-        assertThatThrownBy(() ->
-                cashService.deposit(TEST_LOGIN, request))
+        assertThatThrownBy(() -> cashService.deposit(TEST_LOGIN, request, TEST_OPERATION_ID))
                 .isInstanceOf(OperationBlockedException.class)
                 .hasMessage("Подозрительная операция");
 
-        verify(blockerClient)
-                .check(any(OperationCheckRequestViewModel.class));
+        verify(blockerClient).check(any(OperationCheckRequestViewModel.class));
 
-        verifyNoInteractions(
-                accountClient,
-                exchangeClient,
-                accountBalanceMapper,
-                notificationClient
-        );
+        verifyNoInteractions(accountClient, exchangeClient, accountBalanceMapper, notificationEventPublisher);
     }
 
     /**
@@ -556,31 +410,17 @@ public class CashServiceImplTest {
      **/
     @Test
     public void shouldThrowOperationBlockedExceptionWhenWithdrawIsBlocked() {
-        var request = new CashOperationRequestViewModel(
-                new BigDecimal("200.00"),
-                CurrencyEnumModel.RUB
-        );
+        var request = new CashOperationRequestViewModel(new BigDecimal("200.00"), CurrencyEnumModel.RUB);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(
-                        false,
-                        "Подозрительная операция"
-                ));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(false, "Подозрительная операция"));
 
-        assertThatThrownBy(() ->
-                cashService.withdraw(TEST_LOGIN, request))
+        assertThatThrownBy(() -> cashService.withdraw(TEST_LOGIN, request, TEST_OPERATION_ID))
                 .isInstanceOf(OperationBlockedException.class)
                 .hasMessage("Подозрительная операция");
 
-        verify(blockerClient)
-                .check(any(OperationCheckRequestViewModel.class));
+        verify(blockerClient).check(any(OperationCheckRequestViewModel.class));
 
-        verifyNoInteractions(
-                accountClient,
-                exchangeClient,
-                accountBalanceMapper,
-                notificationClient
-        );
+        verifyNoInteractions(accountClient, exchangeClient, accountBalanceMapper, notificationEventPublisher);
     }
 
     /**
@@ -592,65 +432,36 @@ public class CashServiceImplTest {
     @Test
     public void shouldBlockForeignCurrencyDepositUsingNormalizedAmount() {
         var amount = new BigDecimal("100.00");
+
         var normalizedAmount = new BigDecimal("9500.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.USD
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.USD);
 
         var conversion = mock(ConversionResponseViewModel.class);
 
-        when(conversion.targetAmount())
-                .thenReturn(normalizedAmount);
+        when(conversion.targetAmount()).thenReturn(normalizedAmount);
 
-        when(exchangeClient.convert(
-                CurrencyEnumModel.USD,
-                CurrencyEnumModel.RUB,
-                amount
-        )).thenReturn(conversion);
+        when(exchangeClient.convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount)).thenReturn(conversion);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(
-                        false,
-                        "Подозрительная операция"
-                ));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(false, "Подозрительная операция"));
 
-        assertThatThrownBy(() ->
-                cashService.deposit(TEST_LOGIN, request))
+        assertThatThrownBy(() -> cashService.deposit(TEST_LOGIN, request, TEST_OPERATION_ID))
                 .isInstanceOf(OperationBlockedException.class)
                 .hasMessage("Подозрительная операция");
 
-        var captor =
-                ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
+        var captor = ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
 
         verify(blockerClient).check(captor.capture());
 
         var blockerRequest = captor.getValue();
 
-        assertThat(blockerRequest.amount())
-                .isEqualByComparingTo(amount);
+        assertThat(blockerRequest.amount()).isEqualByComparingTo(amount);
 
-        assertThat(blockerRequest.currency())
-                .isEqualTo(CurrencyEnumModel.USD);
+        assertThat(blockerRequest.normalizedAmount()).isEqualByComparingTo(normalizedAmount);
 
-        assertThat(blockerRequest.normalizedAmount())
-                .isEqualByComparingTo(normalizedAmount);
+        verify(exchangeClient).convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount);
 
-        assertThat(blockerRequest.baseCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        verify(exchangeClient).convert(
-                CurrencyEnumModel.USD,
-                CurrencyEnumModel.RUB,
-                amount
-        );
-
-        verifyNoInteractions(
-                accountClient,
-                accountBalanceMapper,
-                notificationClient
-        );
+        verifyNoInteractions(accountClient, accountBalanceMapper, notificationEventPublisher);
     }
 
     /**
@@ -663,60 +474,35 @@ public class CashServiceImplTest {
     public void shouldSendCorrectDepositRequestToBlocker() {
         var amount = new BigDecimal("500.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.RUB
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.RUB);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(true, null));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         var balanceResponse = mock(AccountBalanceResponseViewModel.class);
 
-        when(balanceResponse.balance())
-                .thenReturn(new BigDecimal("1500.00"));
+        when(balanceResponse.balance()).thenReturn(new BigDecimal("1500.00"));
 
-        when(balanceResponse.currency())
-                .thenReturn(CURRENCY);
+        when(balanceResponse.currency()).thenReturn(CURRENCY);
 
-        when(accountClient.deposit(any()))
-                .thenReturn(balanceResponse);
+        when(accountClient.deposit(any())).thenReturn(balanceResponse);
 
-        cashService.deposit(TEST_LOGIN, request);
+        cashService.deposit(TEST_LOGIN, request, TEST_OPERATION_ID);
 
-        var captor =
-                ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
+        var captor = ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
 
         verify(blockerClient).check(captor.capture());
 
         var blockerRequest = captor.getValue();
 
-        assertThat(blockerRequest.operationId())
-                .isNotBlank();
+        assertThat(blockerRequest.operationId()).isEqualTo(TEST_OPERATION_ID.toString());
 
-        assertThat(blockerRequest.operationType())
-                .isEqualTo(OperationTypeEnumModel.DEPOSIT);
+        assertThat(blockerRequest.operationType()).isEqualTo(OperationTypeEnumModel.DEPOSIT);
 
-        assertThat(blockerRequest.login())
-                .isEqualTo(TEST_LOGIN);
+        assertThat(blockerRequest.login()).isEqualTo(TEST_LOGIN);
 
-        assertThat(blockerRequest.sender())
-                .isNull();
+        assertThat(blockerRequest.sender()).isNull();
 
-        assertThat(blockerRequest.recipient())
-                .isNull();
-
-        assertThat(blockerRequest.amount())
-                .isEqualByComparingTo(amount);
-
-        assertThat(blockerRequest.currency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        assertThat(blockerRequest.normalizedAmount())
-                .isEqualByComparingTo(amount);
-
-        assertThat(blockerRequest.baseCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(blockerRequest.recipient()).isNull();
 
         verifyNoInteractions(exchangeClient);
     }
@@ -731,62 +517,31 @@ public class CashServiceImplTest {
     public void shouldSendCorrectWithdrawRequestToBlocker() {
         var amount = new BigDecimal("200.00");
 
-        var request = new CashOperationRequestViewModel(
-                amount,
-                CurrencyEnumModel.RUB
-        );
+        var request = new CashOperationRequestViewModel(amount, CurrencyEnumModel.RUB);
 
-        when(blockerClient.check(any()))
-                .thenReturn(new OperationCheckResponseViewModel(true, null));
+        when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         var balanceResponse = mock(AccountBalanceResponseViewModel.class);
 
-        when(balanceResponse.balance())
-                .thenReturn(new BigDecimal("800.00"));
+        when(balanceResponse.balance()).thenReturn(new BigDecimal("800.00"));
 
-        when(balanceResponse.currency())
-                .thenReturn(CURRENCY);
+        when(balanceResponse.currency()).thenReturn(CURRENCY);
 
-        when(accountClient.withdraw(any()))
-                .thenReturn(balanceResponse);
+        when(accountClient.withdraw(any())).thenReturn(balanceResponse);
 
-        cashService.withdraw(TEST_LOGIN, request);
+        cashService.withdraw(TEST_LOGIN, request, TEST_OPERATION_ID);
 
-        var captor =
-                ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
+        var captor = ArgumentCaptor.forClass(OperationCheckRequestViewModel.class);
 
         verify(blockerClient).check(captor.capture());
 
         var blockerRequest = captor.getValue();
 
-        assertThat(blockerRequest.operationId())
-                .isNotBlank();
+        assertThat(blockerRequest.operationId()).isEqualTo(TEST_OPERATION_ID.toString());
 
-        assertThat(blockerRequest.operationType())
-                .isEqualTo(OperationTypeEnumModel.WITHDRAW);
+        assertThat(blockerRequest.operationType()).isEqualTo(OperationTypeEnumModel.WITHDRAW);
 
-        assertThat(blockerRequest.login())
-                .isEqualTo(TEST_LOGIN);
-
-        assertThat(blockerRequest.sender())
-                .isNull();
-
-        assertThat(blockerRequest.recipient())
-                .isNull();
-
-        assertThat(blockerRequest.amount())
-                .isEqualByComparingTo(amount);
-
-        assertThat(blockerRequest.currency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        assertThat(blockerRequest.normalizedAmount())
-                .isEqualByComparingTo(amount);
-
-        assertThat(blockerRequest.baseCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        verifyNoInteractions(exchangeClient);
+        assertThat(blockerRequest.login()).isEqualTo(TEST_LOGIN);
     }
 
     /**
@@ -797,31 +552,17 @@ public class CashServiceImplTest {
      **/
     @Test
     public void shouldThrowInvalidAmountExceptionWhenAmountIsZeroOrNegative() {
-        var zeroRequest = new CashOperationRequestViewModel(
-                BigDecimal.ZERO,
-                CurrencyEnumModel.RUB
-        );
+        var zeroRequest = new CashOperationRequestViewModel(BigDecimal.ZERO, CurrencyEnumModel.RUB);
 
-        var negativeRequest = new CashOperationRequestViewModel(
-                new BigDecimal("-100.00"),
-                CurrencyEnumModel.RUB
-        );
+        var negativeRequest = new CashOperationRequestViewModel(new BigDecimal("-100.00"), CurrencyEnumModel.RUB);
 
-        assertThatThrownBy(() ->
-                cashService.deposit(TEST_LOGIN, zeroRequest))
+        assertThatThrownBy(() -> cashService.deposit(TEST_LOGIN, zeroRequest, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountException.class);
 
-        assertThatThrownBy(() ->
-                cashService.withdraw(TEST_LOGIN, negativeRequest))
+        assertThatThrownBy(() -> cashService.withdraw(TEST_LOGIN, negativeRequest, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountException.class);
 
-        verifyNoInteractions(
-                accountClient,
-                blockerClient,
-                exchangeClient,
-                notificationClient,
-                accountBalanceMapper
-        );
+        verifyNoInteractions(accountClient, blockerClient, exchangeClient, notificationEventPublisher, accountBalanceMapper);
     }
 
     /**
@@ -832,26 +573,15 @@ public class CashServiceImplTest {
      **/
     @Test
     public void shouldThrowInvalidAmountScaleExceptionWhenScaleExceedsTwo() {
-        var invalidScaleRequest = new CashOperationRequestViewModel(
-                new BigDecimal("100.555"),
-                CurrencyEnumModel.RUB
-        );
+        var invalidScaleRequest = new CashOperationRequestViewModel(new BigDecimal("100.555"), CurrencyEnumModel.RUB);
 
-        assertThatThrownBy(() ->
-                cashService.deposit(TEST_LOGIN, invalidScaleRequest))
+        assertThatThrownBy(() -> cashService.deposit(TEST_LOGIN, invalidScaleRequest, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountScaleException.class);
 
-        assertThatThrownBy(() ->
-                cashService.withdraw(TEST_LOGIN, invalidScaleRequest))
+        assertThatThrownBy(() -> cashService.withdraw(TEST_LOGIN, invalidScaleRequest, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountScaleException.class);
 
-        verifyNoInteractions(
-                accountClient,
-                blockerClient,
-                exchangeClient,
-                notificationClient,
-                accountBalanceMapper
-        );
+        verifyNoInteractions(accountClient, blockerClient, exchangeClient, notificationEventPublisher, accountBalanceMapper);
     }
 
     // endregion
