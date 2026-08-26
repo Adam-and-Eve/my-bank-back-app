@@ -17,6 +17,7 @@ dependencies {
     implementation(libs.spring.boot.starter.aop)
     implementation(libs.spring.boot.starter.oauth2.resource.server)
     implementation(libs.spring.retry)
+    implementation(libs.spring.kafka)
 
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.database.postgresql)
@@ -26,4 +27,5 @@ dependencies {
     testImplementation(libs.spring.cloud.starter.contract.verifier)
     testImplementation(libs.spring.security.test)
     testRuntimeOnly(libs.h2)
+    testImplementation(libs.spring.kafka.test)
 }

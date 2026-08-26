@@ -16,8 +16,10 @@ dependencies {
     implementation(libs.spring.boot.starter.oauth2.resource.server)
 
     implementation(libs.spring.boot.starter.oauth2.client)
+    implementation(libs.spring.kafka)
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.cloud.starter.contract.verifier)
     testImplementation(libs.spring.security.test)
+    testImplementation(libs.spring.kafka.test)
 }
