@@ -30,7 +30,7 @@ public abstract class CashNotificationMessagingContractBase {
                 "type", "CASH_DEPOSITED",
                 "recipientLogin", "alexey",
                 "message", "Счёт пополнен на 100.00 RUB",
-                "occurredAt", "2026-07-01T05:01:00Z",
+                "occurredAt", "2026-08-27T05:01:00Z",
                 "amount", "100.00",
                 "currency", "RUB"
         );
