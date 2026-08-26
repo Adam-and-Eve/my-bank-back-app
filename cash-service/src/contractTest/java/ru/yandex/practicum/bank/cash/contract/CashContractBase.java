@@ -13,6 +13,7 @@ import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -27,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * и предустановленным авторизованным принципалом.
  * </summary>
  **/
-public class CashContractBase {
+public abstract class CashContractBase {
 
     // region Setup
 
@@ -41,15 +42,13 @@ public class CashContractBase {
     @BeforeEach
     void setUp() {
         var cashService = mock(CashService.class);
-
-        when(cashService.deposit(eq("dmitry"), any(CashOperationRequestViewModel.class)))
+        when(cashService.deposit(eq("alexey"), any(CashOperationRequestViewModel.class), any(UUID.class)))
                 .thenReturn(new CashOperationResponseViewModel(
                         new BigDecimal("1250.00"),
                         "RUB",
                         "Счёт пополнен"
                 ));
-
-        when(cashService.withdraw(eq("dmitry"), any(CashOperationRequestViewModel.class)))
+        when(cashService.withdraw(eq("alexey"), any(CashOperationRequestViewModel.class), any(UUID.class)))
                 .thenReturn(new CashOperationResponseViewModel(
                         new BigDecimal("900.00"),
                         "RUB",
@@ -58,7 +57,7 @@ public class CashContractBase {
 
         var mockMvc = MockMvcBuilders.standaloneSetup(new CashController(cashService))
                 .setControllerAdvice(new CashExceptionHandler())
-                .defaultRequest(get("/").principal(jwtAuthentication("dmitry")))
+                .defaultRequest(get("/").principal(jwtAuthentication("alexey")))
                 .build();
 
         RestAssuredMockMvc.mockMvc(mockMvc);
@@ -73,9 +72,7 @@ public class CashContractBase {
      * Генерирует объект JwtAuthenticationToken с указанным логином пользователя в claim preferred_username.
      * </summary>
      * @param login Логин пользователя для подстановки в JWT-токен.
-     * <return>
      * @return Сформированный экземпляр JwtAuthenticationToken.
-     * </return>
      **/
     private JwtAuthenticationToken jwtAuthentication(String login) {
         var jwt = Jwt.withTokenValue("token")

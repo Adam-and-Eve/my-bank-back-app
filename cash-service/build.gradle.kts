@@ -6,6 +6,12 @@ plugins {
 
 contracts {
     baseClassForTests.set("ru.yandex.practicum.bank.cash.contract.CashContractBase")
+    baseClassMappings {
+        baseClassMapping(
+            ".*messaging.*",
+            "ru.yandex.practicum.bank.cash.contract.CashNotificationMessagingContractBase",
+        )
+    }
 }
 
 dependencies {
@@ -13,6 +19,7 @@ dependencies {
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.spring.boot.starter.aop)
     implementation(libs.spring.boot.starter.oauth2.resource.server)
 
     implementation(libs.spring.boot.starter.oauth2.client)
@@ -22,4 +29,5 @@ dependencies {
     testImplementation(libs.spring.cloud.starter.contract.verifier)
     testImplementation(libs.spring.security.test)
     testImplementation(libs.spring.kafka.test)
+    implementation(libs.spring.integration.core)
 }
