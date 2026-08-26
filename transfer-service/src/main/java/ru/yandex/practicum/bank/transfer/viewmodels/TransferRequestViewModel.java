@@ -7,13 +7,13 @@ import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 import java.math.BigDecimal;
 
 /**
- * <summary>
  * Модель представления (ViewModel) запроса на перевод денежных средств.
- * </summary>
+ *
  * @param recipientLogin Логин пользователя-получателя перевода.
  * @param amount Сумма перевода.
  * @param currency Валюта выполнения операции.
- **/
+ * @param targetCurrency Валюта зачисления (если не указана, совпадает с currency).
+ */
 public record TransferRequestViewModel (
         @NotBlank
         String recipientLogin,
@@ -34,9 +34,5 @@ public record TransferRequestViewModel (
 
         public TransferRequestViewModel(String recipientLogin, BigDecimal amount, CurrencyEnumModel currency) {
                 this(recipientLogin, amount, currency, currency);
-        }
-
-        public CurrencyEnumModel resolvedTargetCurrency() {
-                return targetCurrency == null ? currency : targetCurrency;
         }
 }

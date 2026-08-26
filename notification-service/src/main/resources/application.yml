@@ -1,6 +1,6 @@
 spring:
   application:
-    name: notifications-service
+    name: notification-service
   jackson:
     default-property-inclusion: non_null
   security:

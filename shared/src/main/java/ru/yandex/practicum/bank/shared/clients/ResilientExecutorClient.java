@@ -44,9 +44,7 @@ public class ResilientExecutorClient {
             decorated = CircuitBreaker.decorateSupplier(circuitBreaker, decorated);
 
             return decorated.get();
-        } catch (CallNotPermittedException exception) {
-            return fallback.apply(exception);
-        } catch (Throwable exception) {
+        } catch (Exception exception) {
             return fallback.apply(exception);
         }
     }

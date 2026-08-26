@@ -171,15 +171,15 @@ def helmSmokeTest(String namespace) {
 def runUmbrellaPipeline() {
 
     def services = [
-            [name: 'notification-service', image: 'my-bank-notification-service'],
-            [name: 'cash-service', image: 'my-bank-cash-service'],
-            [name: 'blocker-service', image: 'my-bank-blocker-service'],
-            [name: 'transfer-service', image: 'my-bank-transfer-service'],
-            [name: 'exchange-service', image: 'my-bank-exchange-service'],
-            [name: 'exchange-generator-service', image: 'my-bank-exchange-generator-service'],
-            [name: 'account-service', image: 'my-bank-account-service'],
-            [name: 'front-ui-service', image: 'my-bank-front-ui-service'],
-            [name: 'api-gateway', image: 'my-bank-api-gateway']
+            [name: 'notification-service', image: 'my-bank-notification-service', hasContractTests: true],
+            [name: 'cash-service', image: 'my-bank-cash-service', hasContractTests: true],
+            [name: 'blocker-service', image: 'my-bank-blocker-service', hasContractTests: true],
+            [name: 'transfer-service', image: 'my-bank-transfer-service', hasContractTests: true],
+            [name: 'exchange-service', image: 'my-bank-exchange-service', hasContractTests: true],
+            [name: 'exchange-generator-service', image: 'my-bank-exchange-generator-service', hasContractTests: false],
+            [name: 'account-service', image: 'my-bank-account-service', hasContractTests: true],
+            [name: 'front-ui-service', image: 'my-bank-front-ui-service', hasContractTests: false],
+            [name: 'api-gateway', image: 'my-bank-api-gateway', hasContractTests: false]
     ]
 
 
@@ -242,7 +242,18 @@ def runUmbrellaPipeline() {
 
 
         stage('Java tests') {
-            gradle('test contractTest')
+            gradle('test')
+
+            def contractTasks = services
+                    .findAll { it.hasContractTests }
+                    .collect { ":${it.name}:contractTest" }
+                    .join(' ')
+
+            if (contractTasks) {
+                gradle(contractTasks)
+            } else {
+                echo 'No contract tests configured for these services, skipping.'
+            }
         }
 
 
