@@ -20,5 +20,3 @@ bank:
       base-url: http://localhost:8086
     exchange-generator-service:
       fixed-delay-ms: 1000
-    notification-service:
-      base-url: http://localhost:8084

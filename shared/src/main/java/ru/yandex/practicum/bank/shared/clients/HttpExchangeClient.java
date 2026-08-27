@@ -10,6 +10,7 @@ import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
 import ru.yandex.practicum.bank.shared.viewmodels.ConversionResponseViewModel;
+import ru.yandex.practicum.bank.shared.viewmodels.ExchangeRatesUpdateRequestViewModel;
 
 import java.math.BigDecimal;
 
@@ -20,7 +21,7 @@ public class HttpExchangeClient  implements ExchangeClient {
 
     private final RestClient restClient;
     private final ServiceTokenProvider serviceTokenProvider;
-    private final SimpleCircuitBreaker circuitBreaker;
+    private final ResilientExecutorClient clientExecutor;
 
     // endregion
 
@@ -30,26 +31,40 @@ public class HttpExchangeClient  implements ExchangeClient {
     public HttpExchangeClient(
             RestClient.Builder restClientBuilder,
             @Value("${bank.services.exchange-service.base-url}") String exchangeServiceBaseUrl,
-            ServiceTokenProvider serviceTokenProvider
+            ServiceTokenProvider serviceTokenProvider,
+            ResilientFactoryClient factoryClient
     ) {
         this(
                 restClientBuilder,
                 exchangeServiceBaseUrl,
                 serviceTokenProvider,
-                SimpleCircuitBreaker.withDefaults("exchangeService")
+                factoryClient.create("exchangeService")
         );
     }
 
     HttpExchangeClient(
             RestClient.Builder restClientBuilder,
             String exchangeServiceBaseUrl,
+            ServiceTokenProvider serviceTokenProvider
+    ) {
+        this(
+                restClientBuilder,
+                exchangeServiceBaseUrl,
+                serviceTokenProvider,
+                ResilientFactoryClient.withDefaults()
+        );
+    }
+
+    HttpExchangeClient(
+            RestClient.Builder restClientBuilder,
+            String exchangeBaseUrl,
             ServiceTokenProvider serviceTokenProvider,
-            SimpleCircuitBreaker circuitBreaker
+            ResilientExecutorClient executorClient
     ) {
         this.serviceTokenProvider = serviceTokenProvider;
-        this.circuitBreaker = circuitBreaker;
+        this.clientExecutor = executorClient;
         this.restClient = restClientBuilder
-                .baseUrl(exchangeServiceBaseUrl)
+                .baseUrl(exchangeBaseUrl)
                 .build();
     }
 
@@ -58,47 +73,28 @@ public class HttpExchangeClient  implements ExchangeClient {
     // region Methods
 
     @Override
-    public ConversionResponseViewModel convert(CurrencyEnumModel sourceCurrency, CurrencyEnumModel targetCurrency, BigDecimal amount) {
-        return circuitBreaker.execute(
-                () -> convertWithoutCircuitBreaker(sourceCurrency, targetCurrency, amount),
-                this::exchangeFallback
+    public void updateRates(ExchangeRatesUpdateRequestViewModel request) {
+        clientExecutor.execute(
+                () -> {
+                    updateRatesWithoutCircuitBreaker(request);
+
+                    return null;
+                },
+                exception -> null
         );
     }
 
-    private ConversionResponseViewModel convertWithoutCircuitBreaker(
-            CurrencyEnumModel sourceCurrency,
-            CurrencyEnumModel targetCurrency,
-            BigDecimal amount
-    ) {
+    private void updateRatesWithoutCircuitBreaker(ExchangeRatesUpdateRequestViewModel request) {
         try {
-            var response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder
-                            .path("/api/exchange/conversion")
-                            .queryParam("sourceCurrency", sourceCurrency)
-                            .queryParam("targetCurrency", targetCurrency)
-                            .queryParam("amount", amount)
-                            .build())
+            restClient.put()
+                    .uri("/api/exchange/rates")
                     .headers(headers -> headers.setBearerAuth(serviceTokenProvider.getAccessToken()))
+                    .body(request)
                     .retrieve()
-                    .body(ConversionResponseViewModel.class);
-
-            if (response == null) {
-                throw new ExchangeClientException("Exchange service returned empty response");
-            }
-
-            return response;
-
+                    .toBodilessEntity();
         } catch (RestClientException exception) {
             throw new ExchangeClientException("Exchange service request failed", exception);
         }
-    }
-
-    private ConversionResponseViewModel exchangeFallback(Throwable exception) {
-        if (exception instanceof ExchangeClientException exchangeClientException) {
-            throw exchangeClientException;
-        }
-
-        throw new ExchangeClientException("Сервис курсов валют временно недоступен", exception);
     }
 
     // endregion

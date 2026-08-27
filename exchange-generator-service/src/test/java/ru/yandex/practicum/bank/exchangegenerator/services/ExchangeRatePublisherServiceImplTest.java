@@ -2,8 +2,8 @@ package ru.yandex.practicum.bank.exchangegenerator.services;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import ru.yandex.practicum.bank.exchangegenerator.interfaces.InternalExchangeClient;
 import ru.yandex.practicum.bank.exchangegenerator.interfaces.ExchangeRateGeneratorService;
+import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
 import ru.yandex.practicum.bank.shared.viewmodels.ExchangeRatesUpdateRequestViewModel;
 
 import static org.mockito.Mockito.mock;
@@ -31,7 +31,7 @@ public class ExchangeRatePublisherServiceImplTest {
      * Mock клиента для публикации курсов валют в Exchange Service.
      * </summary>
      **/
-    private InternalExchangeClient internalExchangeClient;
+    private ExchangeClient exchangeClient;
 
     /**
      * <summary>
@@ -53,11 +53,11 @@ public class ExchangeRatePublisherServiceImplTest {
     void setUp() {
         exchangeRateGenerator = mock(ExchangeRateGeneratorService.class);
 
-        internalExchangeClient = mock(InternalExchangeClient.class);
+        exchangeClient = mock(ExchangeClient.class);
 
         service = new ExchangeRatePublisherServiceImpl(
                 exchangeRateGenerator,
-                internalExchangeClient
+                exchangeClient
         );
     }
 
@@ -80,7 +80,7 @@ public class ExchangeRatePublisherServiceImplTest {
 
         verify(exchangeRateGenerator).nextRates();
 
-        verify(internalExchangeClient).updateRates(rates);
+        verify(exchangeClient).updateRates(rates);
     }
 
     /**
@@ -103,9 +103,9 @@ public class ExchangeRatePublisherServiceImplTest {
 
         service.publishNextRates();
 
-        verify(internalExchangeClient).updateRates(firstRates);
+        verify(exchangeClient).updateRates(firstRates);
 
-        verify(internalExchangeClient).updateRates(secondRates);
+        verify(exchangeClient).updateRates(secondRates);
     }
 
     // endregion
