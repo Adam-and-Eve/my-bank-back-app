@@ -10,12 +10,14 @@ import org.springframework.test.context.TestPropertySource;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * <summary>
  * Тесты уровня данных (Data JPA) для репозитория ProcessedOperationRepository.
  * Проверяют корректность выполнения нативного SQL-запроса атомарной регистрации
- * новой операции со статусом PROCESSING и обработку уникальности ключей.
+ * новой операции со статусом PROCESSING, обработку уникальности ключей
+ * и логику очистки зависших (stale) транзакций.
  * </summary>
  **/
 @DataJpaTest
@@ -50,7 +52,7 @@ public class ProcessedOperationRepositoryTest {
     /**
      * <summary>
      * Проверяет успешную вставку новой записи операции со статусом PROCESSING.
-     * Проверяет, что вернётся 1 изменённая строка, и данные корректно сохранятся в БД.
+     * Убеждается, что возвращается 1 изменённая строка, и данные корректно сохраняются в БД.
      * </summary>
      **/
     @Test
@@ -100,7 +102,7 @@ public class ProcessedOperationRepositoryTest {
                 now
         );
 
-        org.junit.jupiter.api.Assertions.assertThrows(
+        assertThrows(
                 DataIntegrityViolationException.class,
                 () -> processedOperationRepository.insertProcessing(
                         OPERATION_ID,
@@ -109,6 +111,62 @@ public class ProcessedOperationRepositoryTest {
                         now
                 )
         );
+    }
+
+    /**
+     * <summary>
+     * Проверяет успешное удаление зависшей операции со статусом PROCESSING,
+     * если время её последнего обновления меньше или равно пороговому значению.
+     * </summary>
+     **/
+    @Test
+    public void shouldDeleteStaleProcessingOperationSuccessfully() {
+        var oldDate = LocalDateTime.now().minusMinutes(10);
+
+        processedOperationRepository.insertProcessing(
+                OPERATION_ID,
+                OPERATION_TYPE,
+                REQUEST_HASH,
+                oldDate
+        );
+
+        var staleBefore = LocalDateTime.now().minusMinutes(5);
+
+        int rowsDeleted = processedOperationRepository.deleteStaleProcessing(OPERATION_ID, staleBefore);
+
+        assertThat(rowsDeleted).isEqualTo(1);
+
+        entityManager.clear();
+
+        assertThat(processedOperationRepository.findById(OPERATION_ID)).isEmpty();
+    }
+
+    /**
+     * <summary>
+     * Проверяет, что операция не удаляется, если она была обновлена позже порогового значения
+     * (то есть она еще активна и не считается зависшей).
+     * </summary>
+     **/
+    @Test
+    public void shouldNotDeleteRecentProcessingOperation() {
+        var recentDate = LocalDateTime.now().minusMinutes(2);
+
+        processedOperationRepository.insertProcessing(
+                OPERATION_ID,
+                OPERATION_TYPE,
+                REQUEST_HASH,
+                recentDate
+        );
+
+        var staleBefore = LocalDateTime.now().minusMinutes(5);
+
+        int rowsDeleted = processedOperationRepository.deleteStaleProcessing(OPERATION_ID, staleBefore);
+
+        assertThat(rowsDeleted).isEqualTo(0);
+
+        entityManager.clear();
+
+        assertThat(processedOperationRepository.findById(OPERATION_ID)).isPresent();
     }
 
     // endregion

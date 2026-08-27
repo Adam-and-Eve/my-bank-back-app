@@ -38,13 +38,9 @@ public class BalanceServiceImplTest {
     // region Constants
 
     private static final String OPERATION_ID = "op-balance-001";
-
     private static final String LOGIN = "dmitry";
-
     private static final String RECIPIENT_LOGIN = "alexey";
-
     private static final BigDecimal AMOUNT = new BigDecimal("150.50");
-
     private static final CurrencyEnumModel CURRENCY = CurrencyEnumModel.RUB;
 
     // endregion
@@ -97,7 +93,6 @@ public class BalanceServiceImplTest {
                 any(Supplier.class)
         )).thenAnswer(invocation -> {
             Supplier<BalanceResponseViewModel> supplier = invocation.getArgument(4);
-
             return supplier.get();
         });
 
@@ -120,14 +115,14 @@ public class BalanceServiceImplTest {
 
     /**
      * <summary>
-     * Проверяет выброс NullPointerException при null-запросе на пополнение.
+     * Проверяет выброс NullPointerException при null-запросе на пополнение
+     * (исключение возникает при попытке получить request.operationId() до передачи в IdempotencyService).
      * </summary>
      **/
     @Test
     public void shouldThrowNullPointerExceptionWhenDepositRequestIsNull() {
         assertThatThrownBy(() -> balanceService.deposit(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Deposit request");
+                .isInstanceOf(NullPointerException.class);
 
         verifyNoInteractions(idempotencyService, operationService);
     }
@@ -189,8 +184,7 @@ public class BalanceServiceImplTest {
     @Test
     public void shouldThrowNullPointerExceptionWhenWithdrawRequestIsNull() {
         assertThatThrownBy(() -> balanceService.withdraw(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Withdraw request");
+                .isInstanceOf(NullPointerException.class);
 
         verifyNoInteractions(idempotencyService, operationService);
     }
@@ -225,7 +219,6 @@ public class BalanceServiceImplTest {
                 any(Supplier.class)
         )).thenAnswer(invocation -> {
             Supplier<TransferBalanceResponseViewModel> supplier = invocation.getArgument(4);
-
             return supplier.get();
         });
 
@@ -254,8 +247,7 @@ public class BalanceServiceImplTest {
     @Test
     public void shouldThrowNullPointerExceptionWhenTransferRequestIsNull() {
         assertThatThrownBy(() -> balanceService.transfer(null))
-                .isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Transfer request");
+                .isInstanceOf(NullPointerException.class);
 
         verifyNoInteractions(idempotencyService, operationService);
     }
@@ -336,12 +328,7 @@ public class BalanceServiceImplTest {
     public void shouldPassTransferOperationType() {
         var request = createTransferRequest();
 
-        var response = new TransferBalanceResponseViewModel(
-                LOGIN,
-                RECIPIENT_LOGIN,
-                AMOUNT,
-                CURRENCY.name()
-        );
+        var response = new TransferBalanceResponseViewModel(LOGIN, RECIPIENT_LOGIN, AMOUNT, CURRENCY.name());
 
         when(idempotencyService.execute(
                 any(), any(), any(), any(), any(Supplier.class)

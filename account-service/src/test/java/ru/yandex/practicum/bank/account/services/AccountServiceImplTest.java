@@ -5,11 +5,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import ru.yandex.practicum.bank.account.exceptions.AccountNotFoundException;
 import ru.yandex.practicum.bank.account.exceptions.InvalidBirthdateException;
 import ru.yandex.practicum.bank.account.mappers.AccountMapper;
 import ru.yandex.practicum.bank.account.models.AccountModel;
 import ru.yandex.practicum.bank.account.repositories.AccountRepository;
+import ru.yandex.practicum.bank.account.viewmodels.AccountProfileUpdatedEventViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.AccountResponseViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.RecipientResponseViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.UpdateAccountRequestViewModel;
@@ -33,7 +35,7 @@ import static org.mockito.Mockito.when;
  * <summary>
  * Юнит-тесты бизнес-логики сервиса управления счетами (AccountServiceImpl).
  * Проверяют получение профиля, обновление данных с контролем совершеннолетия (18+),
- * выборку получателей и корректность обработки ошибок.
+ * генерацию доменных событий и выборку получателей, а также корректность обработки ошибок.
  * </summary>
  **/
 @ExtendWith(MockitoExtension.class)
@@ -59,6 +61,9 @@ public class AccountServiceImplTest {
     @Mock
     private AccountMapper accountMapper;
 
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
+
     private Clock fixedClock;
 
     private AccountServiceImpl accountService;
@@ -73,7 +78,12 @@ public class AccountServiceImplTest {
 
         fixedClock = Clock.fixed(fixedInstant, ZoneId.of("UTC"));
 
-        accountService = new AccountServiceImpl(accountRepository, accountMapper, fixedClock);
+        accountService = new AccountServiceImpl(
+                accountRepository,
+                accountMapper,
+                fixedClock,
+                applicationEventPublisher
+        );
     }
 
     // endregion
@@ -138,6 +148,7 @@ public class AccountServiceImplTest {
     /**
      * <summary>
      * Проверяет успешное обновление данных профиля, если возраст ровно 18 лет или старше.
+     * Убеждается, что после успешного обновления публикуется событие AccountProfileUpdatedEventViewModel.
      * </summary>
      **/
     @Test
@@ -172,13 +183,15 @@ public class AccountServiceImplTest {
 
         verify(accountRepository).save(account);
 
+        verify(applicationEventPublisher).publishEvent(any(AccountProfileUpdatedEventViewModel.class));
+
         verify(accountMapper).toResponse(account);
     }
 
     /**
      * <summary>
      * Проверяет выброс InvalidBirthdateException, если пользователю ещё нет 18 лет (несовершеннолетний на 1 день).
-     * Убеждается, что вызовы к репозиторию для сохранения не производятся.
+     * Убеждается, что вызовы к репозиторию и публикатору событий не производятся.
      * </summary>
      **/
     @Test
@@ -193,6 +206,8 @@ public class AccountServiceImplTest {
         verify(accountRepository, never()).findByLogin(any());
 
         verify(accountRepository, never()).save(any());
+
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     /**
@@ -214,6 +229,8 @@ public class AccountServiceImplTest {
         verify(accountRepository).findByLogin(LOGIN_UNKNOWN);
 
         verify(accountRepository, never()).save(any());
+
+        verify(applicationEventPublisher, never()).publishEvent(any());
     }
 
     // endregion
@@ -261,7 +278,6 @@ public class AccountServiceImplTest {
         assertThat(recipients).isEmpty();
 
         verify(accountRepository).findAllByLoginNot(LOGIN_DMITRY);
-
         verify(accountMapper, never()).toRecipientResponse(any());
     }
 

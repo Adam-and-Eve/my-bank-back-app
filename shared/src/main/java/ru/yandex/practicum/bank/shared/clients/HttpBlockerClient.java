@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.shared.clients;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -19,75 +21,72 @@ import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckResponseViewMode
 @Component
 public class HttpBlockerClient implements BlockerClient {
 
-    // region Fields
-
     private final RestClient restClient;
     private final ServiceTokenProvider serviceTokenProvider;
-    private final SimpleCircuitBreaker circuitBreaker;
+    private final ResilientExecutorClient clientExecutor;
 
-    // endregion
-
-    // region Constructors
+    private static final Logger log = LoggerFactory.getLogger(HttpBlockerClient.class);
 
     @Autowired
     public HttpBlockerClient(
             RestClient.Builder restClientBuilder,
             @Value("${bank.services.blocker-service.base-url}") String blockerBaseUrl,
+            ServiceTokenProvider serviceTokenProvider,
+            ResilientFactoryClient resilientClientFactory
+    ) {
+        this(
+                restClientBuilder,
+                blockerBaseUrl,
+                serviceTokenProvider,
+                resilientClientFactory.create("blockerService")
+        );
+    }
+
+    HttpBlockerClient(
+            RestClient.Builder restClientBuilder,
+            String blockerBaseUrl,
             ServiceTokenProvider serviceTokenProvider
     ) {
         this(
                 restClientBuilder,
                 blockerBaseUrl,
                 serviceTokenProvider,
-                SimpleCircuitBreaker.withDefaults("blockerService")
+                ResilientFactoryClient.withDefaults()
         );
     }
 
-    HttpBlockerClient (
+    HttpBlockerClient(
             RestClient.Builder restClientBuilder,
             String blockerBaseUrl,
             ServiceTokenProvider serviceTokenProvider,
-            SimpleCircuitBreaker circuitBreaker
+            ResilientExecutorClient clientExecutor
     ) {
         this.serviceTokenProvider = serviceTokenProvider;
-        this.circuitBreaker = circuitBreaker;
+        this.clientExecutor = clientExecutor;
         this.restClient = restClientBuilder
                 .baseUrl(blockerBaseUrl)
                 .build();
     }
 
-    // endregion
-
-    // region Methods
-
-    /**
-     * <summary>
-     * Отправляет запрос на проверку операции в Blocker Service
-     * с использованием паттерна Circuit Breaker.
-     * </summary>
-     * @param request Данные операции для проверки.
-     * @return Результат проверки операции.
-     * @throws BlockerClientException При ошибке взаимодействия с Blocker Service.
-     **/
     @Override
     public OperationCheckResponseViewModel check(OperationCheckRequestViewModel request) {
-        return circuitBreaker.execute(
+        return clientExecutor.execute(
                 () -> checkWithoutCircuitBreaker(request),
                 this::blockerFallback
         );
     }
 
-    /**
-     * <summary>
-     * Отправляет POST-запрос с токеном авторизации Bearer в Blocker Service
-     * без обертки Circuit Breaker.
-     * </summary>
-     * @param request Данные операции для проверки.
-     * @return Результат проверки операции.
-     * @throws BlockerClientException При сетевых сбоях или пустом ответе от Blocker Service.
-     **/
     private OperationCheckResponseViewModel checkWithoutCircuitBreaker(OperationCheckRequestViewModel request) {
         try {
+            if (log.isDebugEnabled()) {
+                log.debug(
+                        "Blocker downstream request prepared operationId={} operationType={} currency={} source=transfer-service targetService=blocker-service",
+                        request.operationId(),
+                        request.operationType(),
+                        request.currency()
+                );
+            }
+
             var response = restClient.post()
                     .uri("/api/blocker/check")
                     .headers(headers -> headers.setBearerAuth(serviceTokenProvider.getAccessToken()))
@@ -101,27 +100,28 @@ public class HttpBlockerClient implements BlockerClient {
 
             return response;
         } catch (RestClientException exception) {
+            log.error(
+                    "Blocker downstream request failed operationId={} operationType={} currency={} status=error errorCategory=downstream_unavailable errorType={} source=transfer-service targetService=blocker-service",
+                    request.operationId(),
+                    request.operationType(),
+                    request.currency(),
+                    exception.getClass().getSimpleName()
+            );
+
             throw new BlockerClientException("Blocker service request failed", exception);
         }
     }
 
-    /**
-     * <summary>
-     * Обрабатывает сбой Circuit Breaker и преобразует исключение
-     * в исключение клиента Blocker Service.
-     * </summary>
-     * @param exception Исключение, возникшее при выполнении запроса.
-     * @return Результат проверки операции.
-     * @throws BlockerClientException Если произошла ошибка взаимодействия с Blocker Service
-     * или сервис временно недоступен.
-     **/
     private OperationCheckResponseViewModel blockerFallback(Throwable exception) {
         if (exception instanceof BlockerClientException blockerClientException) {
             throw blockerClientException;
         }
 
+        log.error(
+                "Blocker downstream retries exhausted status=error errorCategory=downstream_unavailable errorType={} source=transfer-service targetService=blocker-service",
+                exception.getClass().getSimpleName()
+        );
+
         throw new BlockerClientException("Сервис проверки операций временно недоступен", exception);
     }
-
-    // endregion
 }

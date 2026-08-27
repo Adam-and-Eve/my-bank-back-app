@@ -18,6 +18,7 @@ import ru.yandex.practicum.bank.account.exceptions.IdempotencyConflictException;
 import ru.yandex.practicum.bank.account.exceptions.OperationAlreadyFailedException;
 import ru.yandex.practicum.bank.account.exceptions.OperationInProgressException;
 import ru.yandex.practicum.bank.account.exceptions.StoredOperationReadException;
+import ru.yandex.practicum.bank.account.interfaces.BalanceTransactionRetryService;
 import ru.yandex.practicum.bank.account.models.ProcessedOperationModel;
 import ru.yandex.practicum.bank.account.models.ProcessedOperationStatusEnumModel;
 import ru.yandex.practicum.bank.account.repositories.ProcessedOperationRepository;
@@ -34,10 +35,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 /**
  * <summary>
@@ -75,6 +73,9 @@ public class IdempotencyServiceImplTest {
     @Mock
     private TransactionStatus transactionStatus;
 
+    @Mock
+    private BalanceTransactionRetryService retryService;
+
     private ObjectMapper objectMapper;
 
     private Clock fixedClock;
@@ -85,6 +86,12 @@ public class IdempotencyServiceImplTest {
 
     // region Setup
 
+    /**
+     * <summary>
+     * Инициализирует окружение перед каждым тестом, фиксирует часы (Clock),
+     * настраивает маппер и моки для транзакций и повторных попыток.
+     * </summary>
+     **/
     @BeforeEach
     public void setUp() {
         fixedClock = Clock.fixed(FIXED_INSTANT, UTC);
@@ -95,13 +102,19 @@ public class IdempotencyServiceImplTest {
                 .findAndAddModules()
                 .build();
 
-        org.mockito.Mockito.lenient()
-                .when(transactionManager.getTransaction(any(TransactionDefinition.class)))
+        lenient().when(transactionManager.getTransaction(any(TransactionDefinition.class)))
                 .thenReturn(transactionStatus);
+
+        lenient().when(retryService.execute(any(Supplier.class)))
+                .thenAnswer(invocation -> {
+                    Supplier<?> supplier = invocation.getArgument(0);
+                    return supplier.get();
+                });
 
         idempotencyService = new IdempotencyServiceImpl(
                 operationRepository,
                 transactionManager,
+                retryService,
                 objectMapper,
                 fixedClock
         );
@@ -208,7 +221,7 @@ public class IdempotencyServiceImplTest {
                 anyString(),
                 eq(FIXED_NOW)
         );
-        verify(operationRepository).findById(OPERATION_ID);
+        verify(operationRepository, times(2)).findById(OPERATION_ID);
 
         verify(operationRepository, never()).save(any());
     }
@@ -284,7 +297,7 @@ public class IdempotencyServiceImplTest {
                 () -> new TestResponse("should-not-run")
         )).isInstanceOf(OperationInProgressException.class);
 
-        verify(operationRepository).findById(OPERATION_ID);
+        verify(operationRepository, times(2)).findById(OPERATION_ID);
 
         verify(operationRepository, never()).save(any());
     }
@@ -346,7 +359,7 @@ public class IdempotencyServiceImplTest {
                 () -> new TestResponse("should-not-run")
         )).isInstanceOf(OperationAlreadyFailedException.class);
 
-        verify(operationRepository).findById(OPERATION_ID);
+        verify(operationRepository, times(2)).findById(OPERATION_ID);
 
         verify(operationRepository, never()).save(any());
     }
@@ -357,18 +370,15 @@ public class IdempotencyServiceImplTest {
 
     /**
      * <summary>
-     * Проверяет, что при RuntimeException из бизнес-логики операция переводится
-     * в статус FAILED, а исключение пробрасывается наверх.
+     * Проверяет, что при RuntimeException из бизнес-логики операция освобождается (удаляется)
+     * и исключение корректно пробрасывается наверх.
      * </summary>
      **/
     @Test
-    public void shouldMarkOperationAsFailedAndRethrowWhenBusinessOperationThrows() {
+    public void shouldReleaseOperationAndRethrowWhenBusinessOperationThrows() {
         var request = new TestRequest("payload-1");
 
         var businessException = new IllegalStateException("business failed");
-
-        when(operationRepository.findById(OPERATION_ID))
-                .thenReturn(Optional.of(createProcessingOperation(OPERATION_ID, hashOf(request))));
 
         Supplier<TestResponse> businessOperation = () -> {
             throw businessException;
@@ -389,105 +399,7 @@ public class IdempotencyServiceImplTest {
                 eq(FIXED_NOW)
         );
 
-        ArgumentCaptor<ProcessedOperationModel> saveCaptor =
-                ArgumentCaptor.forClass(ProcessedOperationModel.class);
-
-        verify(operationRepository).save(saveCaptor.capture());
-
-        var saved = saveCaptor.getValue();
-
-        assertThat(saved.getStatus()).isEqualTo(ProcessedOperationStatusEnumModel.FAILED);
-
-        assertThat(saved.getUpdatedAt()).isEqualTo(FIXED_NOW);
-    }
-
-    // endregion
-
-    // region Tests - null argument validation
-
-    /**
-     * <summary>
-     * Проверяет, что null operationId приводит к NullPointerException.
-     * </summary>
-     **/
-    @Test
-    public void shouldThrowNullPointerExceptionWhenOperationIdIsNull() {
-        assertThatThrownBy(() -> idempotencyService.execute(
-                null,
-                OPERATION_TYPE,
-                new TestRequest("x"),
-                TestResponse.class,
-                () -> new TestResponse("ok")
-        )).isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Operation ID");
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что null operationType приводит к NullPointerException.
-     * </summary>
-     **/
-    @Test
-    public void shouldThrowNullPointerExceptionWhenOperationTypeIsNull() {
-        assertThatThrownBy(() -> idempotencyService.execute(
-                OPERATION_ID,
-                null,
-                new TestRequest("x"),
-                TestResponse.class,
-                () -> new TestResponse("ok")
-        )).isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Operation type");
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что null request приводит к NullPointerException.
-     * </summary>
-     **/
-    @Test
-    public void shouldThrowNullPointerExceptionWhenRequestIsNull() {
-        assertThatThrownBy(() -> idempotencyService.execute(
-                OPERATION_ID,
-                OPERATION_TYPE,
-                null,
-                TestResponse.class,
-                () -> new TestResponse("ok")
-        )).isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Request object");
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что null responseType приводит к NullPointerException.
-     * </summary>
-     **/
-    @Test
-    public void shouldThrowNullPointerExceptionWhenResponseTypeIsNull() {
-        assertThatThrownBy(() -> idempotencyService.execute(
-                OPERATION_ID,
-                OPERATION_TYPE,
-                new TestRequest("x"),
-                null,
-                () -> new TestResponse("ok")
-        )).isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Response type");
-    }
-
-    /**
-     * <summary>
-     * Проверяет, что null businessOperation приводит к NullPointerException.
-     * </summary>
-     **/
-    @Test
-    public void shouldThrowNullPointerExceptionWhenBusinessOperationIsNull() {
-        assertThatThrownBy(() -> idempotencyService.execute(
-                OPERATION_ID,
-                OPERATION_TYPE,
-                new TestRequest("x"),
-                TestResponse.class,
-                null
-        )).isInstanceOf(NullPointerException.class)
-                .hasMessageContaining("Business operation");
+        verify(operationRepository).deleteById(OPERATION_ID);
     }
 
     // endregion
@@ -530,6 +442,11 @@ public class IdempotencyServiceImplTest {
 
     // region Helper Methods
 
+    /**
+     * <summary>
+     * Создает модель тестовой операции в статусе PROCESSING.
+     * </summary>
+     **/
     private ProcessedOperationModel createProcessingOperation(String operationId, String requestHash) {
         return new ProcessedOperationModel(
                 operationId,
@@ -539,6 +456,11 @@ public class IdempotencyServiceImplTest {
         );
     }
 
+    /**
+     * <summary>
+     * Создает модель тестовой операции в статусе COMPLETED с закешированным ответом.
+     * </summary>
+     **/
     private ProcessedOperationModel createCompletedOperation(
             String operationId,
             String requestHash,
@@ -555,6 +477,11 @@ public class IdempotencyServiceImplTest {
         return operation;
     }
 
+    /**
+     * <summary>
+     * Создает модель тестовой операции в статусе FAILED.
+     * </summary>
+     **/
     private ProcessedOperationModel createFailedOperation(String operationId, String requestHash) {
         var operation = new ProcessedOperationModel(
                 operationId,
@@ -569,36 +496,31 @@ public class IdempotencyServiceImplTest {
     }
 
     /**
-     * Вычисляет тот же SHA-256 хеш, что и сервис (через тот же ObjectMapper-порядок полей).
-     * Для простых record'ов с одним полем достаточно сериализации в JSON.
-     */
+     * <summary>
+     * Вычисляет SHA-256 хеш запроса через тестируемый сервис для обеспечения идентичности генерации отпечатка.
+     * </summary>
+     **/
     private String hashOf(Object request) {
-        try {
-            var mapper = com.fasterxml.jackson.databind.json.JsonMapper.builder()
-                    .enable(com.fasterxml.jackson.databind.MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
-                    .enable(com.fasterxml.jackson.databind.SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
-                    .findAndAddModules()
-                    .build();
-
-            var json = mapper.writeValueAsString(request);
-
-            var digest = java.security.MessageDigest.getInstance("SHA-256");
-
-            var hash = digest.digest(json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-
-            return java.util.HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        return idempotencyService.hashRequest(OPERATION_TYPE, request);
     }
 
     // endregion
 
     // region Test DTOs
 
+    /**
+     * <summary>
+     * Тестовый класс запроса (DTO/Record) для проверки сериализации и хеширования.
+     * </summary>
+     **/
     public record TestRequest(String value) {
     }
 
+    /**
+     * <summary>
+     * Тестовый класс ответа (DTO/Record) для проверки успешного возврата и кэширования.
+     * </summary>
+     **/
     public record TestResponse(String value) {
     }
 

@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.account.services;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.bank.account.interfaces.BalanceOperationService;
 import ru.yandex.practicum.bank.account.interfaces.BalanceService;
@@ -26,10 +28,19 @@ public class BalanceServiceImpl implements BalanceService {
     private final IdempotencyService idempotencyService;
     private final BalanceOperationService operationService;
 
+    private static final Logger log = LoggerFactory.getLogger(BalanceServiceImpl.class);
+
     // endregion
 
     // region Constructors
 
+    /**
+     * <summary>
+     * Инициализирует сервис координации балансовых операций.
+     * </summary>
+     * @param idempotencyService Сервис для контроля идемпотентности (исключает двойные списания/начисления).
+     * @param operationService Сервис выполнения низкоуровневых бизнес-правил по транзакциям.
+     **/
     public BalanceServiceImpl(
             IdempotencyService idempotencyService,
             BalanceOperationService operationService) {
@@ -39,7 +50,7 @@ public class BalanceServiceImpl implements BalanceService {
 
     // endregion
 
-    // region Methods
+    // region Public Methods
 
     /**
      * <summary>
@@ -47,18 +58,24 @@ public class BalanceServiceImpl implements BalanceService {
      * </summary>
      * @param request ViewModel с параметрами пополнения и уникальным идентификатором операции.
      * @return ViewModel с результатом балансовой операции {@link BalanceResponseViewModel}.
-     */
+     **/
     @Override
     public BalanceResponseViewModel deposit(BalanceOperationRequestViewModel request) {
-        Objects.requireNonNull(request, "Deposit request must not be null");
-
-        return idempotencyService.execute(
+        var response = idempotencyService.execute(
                 request.operationId(),
                 "DEPOSIT",
                 request,
                 BalanceResponseViewModel.class,
                 () -> operationService.deposit(request)
         );
+
+        log.info(
+                "Balance operation completed operationId={} operationType=DEPOSIT currency={} status=success source=account-service",
+                request.operationId(),
+                request.currency()
+        );
+
+        return response;
     }
 
     /**
@@ -67,18 +84,24 @@ public class BalanceServiceImpl implements BalanceService {
      * </summary>
      * @param request ViewModel с параметрами снятия и уникальным идентификатором операции.
      * @return ViewModel с результатом балансовой операции {@link BalanceResponseViewModel}.
-     */
+     **/
     @Override
     public BalanceResponseViewModel withdraw(BalanceOperationRequestViewModel request) {
-        Objects.requireNonNull(request, "Withdraw request must not be null");
-
-        return idempotencyService.execute(
+        var response = idempotencyService.execute(
                 request.operationId(),
                 "WITHDRAW",
                 request,
                 BalanceResponseViewModel.class,
                 () -> operationService.withdraw(request)
         );
+
+        log.info(
+                "Balance operation completed operationId={} operationType=WITHDRAW currency={} status=success source=account-service",
+                request.operationId(),
+                request.currency()
+        );
+
+        return response;
     }
 
     /**
@@ -87,18 +110,24 @@ public class BalanceServiceImpl implements BalanceService {
      * </summary>
      * @param request ViewModel с параметрами перевода и уникальным идентификатором операции.
      * @return ViewModel с результатом перевода {@link TransferBalanceResponseViewModel}.
-     */
+     **/
     @Override
     public TransferBalanceResponseViewModel transfer(TransferBalanceRequestViewModel request) {
-        Objects.requireNonNull(request, "Transfer request must not be null");
-
-        return idempotencyService.execute(
+        var response = idempotencyService.execute(
                 request.operationId(),
                 "TRANSFER",
                 request,
                 TransferBalanceResponseViewModel.class,
                 () -> operationService.transfer(request)
         );
+
+        log.info(
+                "Balance operation completed operationId={} operationType=TRANSFER currency={} status=success source=account-service",
+                request.operationId(),
+                request.currency()
+        );
+
+        return response;
     }
 
     // endregion

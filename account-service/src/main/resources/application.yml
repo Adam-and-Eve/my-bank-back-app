@@ -11,12 +11,53 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+  kafka:
+    admin:
+      fail-fast: true
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      retries: 2147483647
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        "[enable.idempotence]": true
+        "[delivery.timeout.ms]": 120000
+        "[request.timeout.ms]": 30000
+        "[max.in.flight.requests.per.connection]": 5
+    template:
+      observation-enabled: true
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${BANK_KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/my-bank-realm}
           jwk-set-uri: ${BANK_KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/certs}
+
+bank:
+  balance:
+    retry:
+      max-attempts: ${BANK_BALANCE_RETRY_MAX_ATTEMPTS:3}
+      backoff-ms: ${BANK_BALANCE_RETRY_BACKOFF_MS:50}
+  kafka:
+    notification-dlt-topic: ${BANK_KAFKA_NOTIFICATION_DLT_TOPIC:bank.notification.dlt}
+    notification-dlt-partitions: ${BANK_KAFKA_NOTIFICATION_DLT_PARTITIONS:3}
+    notification-dlt-retention-ms: ${BANK_KAFKA_NOTIFICATION_DLT_RETENTION_MS:604800000}
+    notification-partitions: ${BANK_KAFKA_NOTIFICATION_PARTITIONS:3}
+    notification-replication-factor: ${BANK_KAFKA_NOTIFICATION_REPLICATION_FACTOR:1}
+    notification-topic: ${BANK_KAFKA_NOTIFICATION_TOPIC:bank.notification}
+
+jdbc:
+  datasource-proxy:
+    enabled: true
+    include-parameter-values: false
+    query:
+      enable-logging: false
+  includes:
+    - CONNECTION
+    - QUERY
+  resultset-operations:
+    enabled: false
 
 management:
   endpoints:

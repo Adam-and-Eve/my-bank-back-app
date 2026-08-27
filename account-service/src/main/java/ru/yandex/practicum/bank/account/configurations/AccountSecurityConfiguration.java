@@ -41,21 +41,17 @@ import static org.springframework.security.authorization.AuthorityAuthorizationM
 @EnableWebSecurity
 public class AccountSecurityConfiguration {
 
-    // Beans
+    // region Beans
 
     /**
      * <summary>
-     * Настраивает цепочку фильтров безопасности HTTP.
-     * Определяет ролевую модель для публичных, пользовательских и межсервисных (internal) эндпоинтов,
-     * отключает CSRF и сессии, подключает OAuth2 Resource Server и обработчики ошибок.
+     * Определяет основную цепочку фильтров безопасности (SecurityFilterChain).
+     * Отключает CSRF и сессии (Stateless), задает публичный доступ к actuator-эндпоинтам,
+     * настраивает строгую маршрутизацию для пользовательских и служебных эндпоинтов
+     * с требованием нескольких комбинированных ролей (через allOf),
+     * а также подключает кастомные обработчики ошибок.
      * </summary>
-     * @param http Объект настройки HTTP-безопасности.
-     * @param jwtAuthenticationConverter Конвертер JWT-токена в объект аутентификации Spring Security.
-     * @param authenticationEntryPoint Обработчик ошибок неаутентифицированного доступа (401).
-     * @param accessDeniedHandler Обработчик ошибок недостатка прав (403).
-     * @return Сформированная цепочка фильтров {@link SecurityFilterChain}.
-     * @throws Exception Если возникла ошибка при сборке конфигурации.
-     */
+     **/
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
@@ -67,7 +63,7 @@ public class AccountSecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/account/me")
                         .access(allOf(hasRole("USER"), hasRole("ACCOUNT_READ")))
                         .requestMatchers(HttpMethod.GET, "/api/account/recipients")
@@ -91,10 +87,10 @@ public class AccountSecurityConfiguration {
 
     /**
      * <summary>
-     * Создает конвертер JWT-токена с кастомным извлечением ролей из claim 'realm_access'.
+     * Создает конвертер JWT-токенов, который отвечает за извлечение ролей пользователя и сервиса
+     * из специфичных claims (realm_access) и их преобразование в GrantedAuthority.
      * </summary>
-     * @return Экземпляр {@link Converter} для превращения {@link Jwt} в {@link AbstractAuthenticationToken}.
-     */
+     **/
     @Bean
     Converter<Jwt, AbstractAuthenticationToken> jwtAuthenticationConverter() {
         var converter = new JwtAuthenticationConverter();
@@ -106,12 +102,10 @@ public class AccountSecurityConfiguration {
 
     /**
      * <summary>
-     * Формирует точка входа для обработки ошибок неаутентифицированного запроса (HTTP 401 Unauthorized).
-     * Возвращает JSON с моделью {@link ApiErrorResponseViewModel}.
+     * Настраивает обработчик ошибки 401 (Unauthorized).
+     * Возвращает клиенту стандартизированный JSON-ответ ApiErrorResponseViewModel вместо стандартного HTML.
      * </summary>
-     * @param objectMapper Сериализатор JSON.
-     * @return Реализация {@link AuthenticationEntryPoint}.
-     */
+     **/
     @Bean
     AuthenticationEntryPoint authenticationEntryPoint(ObjectMapper objectMapper) {
         return (request, response, exception) -> writeError(
@@ -124,12 +118,10 @@ public class AccountSecurityConfiguration {
 
     /**
      * <summary>
-     * Формирует обработчик ошибок для случаев недостатка прав доступа (HTTP 403 Forbidden).
-     * Возвращает JSON с моделью {@link ApiErrorResponseViewModel}.
+     * Настраивает обработчик ошибки 403 (Forbidden).
+     * Возвращает стандартизированный JSON-ответ при попытке выполнить операцию без необходимых ролей.
      * </summary>
-     * @param objectMapper Сериализатор JSON.
-     * @return Реализация {@link AccessDeniedHandler}.
-     */
+     **/
     @Bean
     AccessDeniedHandler accessDeniedHandler(ObjectMapper objectMapper) {
         return (request, response, exception) -> writeError(
@@ -142,16 +134,16 @@ public class AccountSecurityConfiguration {
 
     // endregion
 
-    // region Methods
+    // region Private Methods
 
     /**
      * <summary>
-     * Извлекает список ролей из объекта claim 'realm_access' JWT-токена Keycloak
-     * и преобразует их в объекты {@link GrantedAuthority} с префиксом 'ROLE_'.
+     * Вспомогательный метод для парсинга JWT-токена (Keycloak-формат).
+     * Извлекает массив ролей из claim 'realm_access' и добавляет к каждой роли префикс 'ROLE_'.
      * </summary>
-     * @param jwt Декодированный JWT-токен.
-     * @return Коллекция прав авторизации {@link GrantedAuthority}.
-     */
+     * @param jwt Входящий JWT-токен.
+     * @return Коллекция прав доступа (GrantedAuthority).
+     **/
     private Collection<GrantedAuthority> extractRealmRoles(Jwt jwt) {
         Map<String, Object> realmAccess = jwt.getClaim("realm_access");
 
@@ -159,7 +151,7 @@ public class AccountSecurityConfiguration {
             return Collections.emptyList();
         }
 
-        var  roles = realmAccess.get("roles");
+        var roles = realmAccess.get("roles");
 
         if (!(roles instanceof List<?> roleList)) {
             return Collections.emptyList();
@@ -175,15 +167,14 @@ public class AccountSecurityConfiguration {
 
     /**
      * <summary>
-     * Записывает объект ошибки {@link ApiErrorResponseViewModel} в поток вывода HTTP-ответа
-     * с указанным статусом и заголовком Content-Type: application/json.
+     * Вспомогательный метод для сериализации объекта ApiErrorResponseViewModel в HTTP-ответ.
      * </summary>
-     * @param objectMapper Сериализатор JSON.
-     * @param response Объект HTTP-ответа.
-     * @param status Устанавливаемый HTTP-статус.
-     * @param error Модель информации об ошибке.
-     * @throws IOException В случае ошибки записи в поток вывода ответа.
-     */
+     * @param objectMapper Экземпляр ObjectMapper для преобразования объекта в JSON.
+     * @param response HTTP-ответ, в который производится запись.
+     * @param status HTTP статус-код, который необходимо вернуть (например, 401 или 403).
+     * @param error Объект ошибки, содержащий код и сообщение.
+     * @throws IOException Если возникает ошибка при записи в поток вывода.
+     **/
     private void writeError(
             ObjectMapper objectMapper,
             jakarta.servlet.http.HttpServletResponse response,
