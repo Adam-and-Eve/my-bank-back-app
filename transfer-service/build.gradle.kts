@@ -6,6 +6,12 @@ plugins {
 
 contracts {
     baseClassForTests.set("ru.yandex.practicum.bank.transfer.contract.TransferContractBase")
+    baseClassMappings {
+        baseClassMapping(
+            ".*messaging.*",
+            "ru.yandex.practicum.bank.transfer.contract.TransferNotificationMessagingContractBase",
+        )
+    }
 }
 
 dependencies {
@@ -22,4 +28,5 @@ dependencies {
     testImplementation(libs.spring.cloud.starter.contract.verifier)
     testImplementation(libs.spring.security.test)
     testImplementation(libs.spring.kafka.test)
+    testImplementation(libs.spring.integration.core)
 }
