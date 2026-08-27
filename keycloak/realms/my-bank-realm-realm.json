@@ -19,7 +19,6 @@
       { "name": "TRANSFER_WRITE", "description": "Permission to perform transfer" },
       { "name": "SERVICE", "description": "Generic service role for microservices" },
       { "name": "ACCOUNT_INTERNAL", "description": "Permission to call internal account API" },
-      { "name": "NOTIFICATION_WRITE", "description": "Permission to create notification" },
       { "name": "EXCHANGE_GENERATOR", "description": "Permission to update exchange rates" }
     ]
   },
@@ -74,16 +73,6 @@
       "serviceAccountsEnabled": true
     },
     {
-      "clientId": "notification-service",
-      "name": "Notification Service",
-      "protocol": "openid-connect",
-      "publicClient": false,
-      "secret": "${BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET}",
-      "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": true
-    },
-    {
       "clientId": "exchange-generator-service",
       "name": "Exchange Generator Service",
       "protocol": "openid-connect",
@@ -132,25 +121,19 @@
       "username": "service-account-cash-service",
       "enabled": true,
       "serviceAccountClientId": "cash-service",
-      "realmRoles": ["SERVICE", "ACCOUNT_INTERNAL", "NOTIFICATION_WRITE"]
+      "realmRoles": ["SERVICE", "ACCOUNT_INTERNAL"]
     },
     {
       "username": "service-account-transfer-service",
       "enabled": true,
       "serviceAccountClientId": "transfer-service",
-      "realmRoles": ["SERVICE", "ACCOUNT_INTERNAL", "NOTIFICATION_WRITE"]
+      "realmRoles": ["SERVICE", "ACCOUNT_INTERNAL"]
     },
     {
       "username": "service-account-account-service",
       "enabled": true,
       "serviceAccountClientId": "account-service",
-      "realmRoles": ["SERVICE", "NOTIFICATION_WRITE"]
-    },
-    {
-      "username": "service-account-notification-service",
-      "enabled": true,
-      "serviceAccountClientId": "notification-service",
-      "realmRoles": ["SERVICE", "NOTIFICATION_WRITE"]
+      "realmRoles": ["SERVICE"]
     },
     {
       "username": "service-account-exchange-generator-service",
