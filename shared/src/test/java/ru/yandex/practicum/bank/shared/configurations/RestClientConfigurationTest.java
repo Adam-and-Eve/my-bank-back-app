@@ -3,63 +3,49 @@ package ru.yandex.practicum.bank.shared.configurations;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationContext;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.web.client.RestClient;
+import ru.yandex.practicum.bank.shared.clients.ResilientFactoryClient;
 
-import java.lang.reflect.Method;
+import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * <summary>
- * Тесты конфигурации RestClientConfiguration.
- * Проверяют корректность создания и регистрации бина RestClient.Builder
- * с поддержкой клиентской балансировки нагрузки.
+ * Интеграционные тесты конфигурации RestClientConfiguration.
+ * Проверяют создание и регистрацию RestClientCustomizer и ResilientFactoryClient
+ * с использованием заданных параметров таймаутов, повторных попыток и Circuit Breaker.
  * </summary>
  **/
 @SpringBootTest(classes = RestClientConfiguration.class)
-public class RestClientConfigurationTest {
-
-    // region Fields
+@TestPropertySource(properties = {
+        "bank.http-client.connect-timeout=5s",
+        "bank.http-client.read-timeout=5s",
+        "bank.http-client.circuit-breaker.failure-threshold=5",
+        "bank.http-client.circuit-breaker.open-duration=10s",
+        "bank.http-client.retry.max-attempts=3",
+        "bank.http-client.retry.backoff=200ms"
+})
+class RestClientConfigurationTest {
 
     @Autowired
-    private ApplicationContext applicationContext;
+    private RestClientConfiguration configuration;
 
     @Autowired
-    private RestClient.Builder restClientBuilder;
+    private ResilientFactoryClient resilientClientFactory;
 
-    // endregion
-
-    // region Tests
-
-    /**
-     * <summary>
-     * Проверяет, что бин RestClient.Builder успешно создается
-     * и регистрируется в контексте Spring.
-     * </summary>
-     **/
     @Test
-    public void shouldRegisterRestClientBuilderBean() {
-        assertThat(restClientBuilder).isNotNull();
+    void shouldRegisterRestClientCustomizerBean() {
+        var customizer = configuration.restClientCustomizer(
+                Duration.ofSeconds(5),
+                Duration.ofSeconds(5)
+        );
 
-        var bean = applicationContext.getBean(RestClient.Builder.class);
-
-        assertThat(bean).isSameAs(restClientBuilder);
+        assertThat(customizer).isNotNull();
     }
 
-    /**
-     * <summary>
-     * Проверяет, что с помощью внедренного RestClient.Builder
-     * можно успешно создать экземпляр RestClient.
-     * </summary>
-     **/
     @Test
-    public void shouldSuccessfullyBuildRestClientInstance() {
-        var restClient = restClientBuilder.build();
-
-        assertThat(restClient).isNotNull();
+    void shouldRegisterResilientClientFactoryBean() {
+        assertThat(resilientClientFactory).isNotNull();
     }
-
-    // endregion
 }
