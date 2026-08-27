@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.shared.clients;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -22,6 +24,8 @@ public class HttpExchangeClient  implements ExchangeClient {
     private final RestClient restClient;
     private final ServiceTokenProvider serviceTokenProvider;
     private final ResilientExecutorClient clientExecutor;
+
+    private static final Logger log = LoggerFactory.getLogger(HttpExchangeClient.class);
 
     // endregion
 
@@ -84,6 +88,14 @@ public class HttpExchangeClient  implements ExchangeClient {
         );
     }
 
+    @Override
+    public ConversionResponseViewModel convert(CurrencyEnumModel sourceCurrency, CurrencyEnumModel targetCurrency, BigDecimal amount) {
+        return clientExecutor.execute(
+                () -> convertWithoutCircuitBreaker(sourceCurrency, targetCurrency, amount),
+                this::exchangeFallback
+        );
+    }
+
     private void updateRatesWithoutCircuitBreaker(ExchangeRatesUpdateRequestViewModel request) {
         try {
             restClient.put()
@@ -95,6 +107,60 @@ public class HttpExchangeClient  implements ExchangeClient {
         } catch (RestClientException exception) {
             throw new ExchangeClientException("Exchange service request failed", exception);
         }
+    }
+
+    private ConversionResponseViewModel convertWithoutCircuitBreaker(
+            CurrencyEnumModel sourceCurrency,
+            CurrencyEnumModel targetCurrency,
+            BigDecimal amount
+    ) {
+        try {
+            if (log.isDebugEnabled()) {
+                log.debug(
+                        "Exchange downstream request prepared operationType=EXCHANGE currency={} targetCurrency={} source=cash-service targetService=exchange-service",
+                        sourceCurrency,
+                        targetCurrency
+                );
+            }
+            var response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder
+                            .path("/api/exchange/conversion")
+                            .queryParam("sourceCurrency", sourceCurrency)
+                            .queryParam("targetCurrency", targetCurrency)
+                            .queryParam("amount", amount)
+                            .build())
+                    .headers(headers -> headers.setBearerAuth(serviceTokenProvider.getAccessToken()))
+                    .retrieve()
+                    .body(ConversionResponseViewModel.class);
+
+            if (response == null) {
+                throw new ExchangeClientException("Exchange service returned empty response");
+            }
+
+            return response;
+        } catch (RestClientException exception) {
+            log.error(
+                    "Exchange downstream request failed operationType=EXCHANGE currency={} targetCurrency={} status=error errorCategory=downstream_unavailable errorType={} source=cash-service targetService=exchange-service",
+                    sourceCurrency,
+                    targetCurrency,
+                    exception.getClass().getSimpleName()
+            );
+
+            throw new ExchangeClientException("Exchange service request failed", exception);
+        }
+    }
+
+    private ConversionResponseViewModel exchangeFallback(Throwable exception) {
+        if (exception instanceof ExchangeClientException exchangeClientException) {
+            throw exchangeClientException;
+        }
+
+        log.error(
+                "Exchange downstream retries exhausted status=error errorCategory=downstream_unavailable errorType={} source=cash-service targetService=exchange-service",
+                exception.getClass().getSimpleName()
+        );
+
+        throw new ExchangeClientException("Exchange service is temporarily unavailable", exception);
     }
 
     // endregion

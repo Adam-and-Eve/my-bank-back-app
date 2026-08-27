@@ -12,5 +12,7 @@ public interface ExchangeClient {
 
     public void updateRates(ExchangeRatesUpdateRequestViewModel request);
 
+    public ConversionResponseViewModel convert(CurrencyEnumModel sourceCurrency, CurrencyEnumModel targetCurrency, BigDecimal amount);
+
     // endregion
 }
