@@ -10,6 +10,7 @@ front-ui-service:
     port: 8085
 
   env:
+    BANK_PUBLIC_BASE_URL: http://localhost:8085
     BANK_SERVICES_ACCOUNT_SERVICE_BASE_URL: http://account-service:8081
     BANK_SERVICES_CASH_SERVICE_BASE_URL: http://cash-service:8082
     BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL: http://exchange-service:8086

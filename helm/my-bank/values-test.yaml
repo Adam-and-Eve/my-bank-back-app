@@ -6,24 +6,24 @@ global:
   env:
     BANK_KEYCLOAK_ISSUER_URI: https://my-bank-test.example.local/realms/my-bank-realm
 
-  gatewayApi:
-    listener:
-      hostname: my-bank-test.example.local
+gatewayApi:
+  listener:
+    hostname: my-bank-test.example.local
 
-  kafka:
-    clusterId: oFd3r3FUc7MK006D_mS9oA
+kafka:
+  clusterId: o5ir33Fm72lElPleLS-9o1
 
-  front-ui:
-    env:
-      BANK_KEYCLOAK_AUTHORIZATION_URI: https://my-bank-test.example.local/realms/my-bank-realm/protocol/openid-connect/auth
-      BANK_KEYCLOAK_END_SESSION_URI: https://my-bank-test.example.local/realms/my-bank-realm/protocol/openid-connect/logout
-      BANK_KEYCLOAK_REDIRECT_URI: https://my-bank-test.example.local/login/oauth2/code/{registrationId}
+front-ui:
+  env:
+    BANK_KEYCLOAK_AUTHORIZATION_URI: https://my-bank-test.example.local/realms/my-bank-realm/protocol/openid-connect/auth
+    BANK_KEYCLOAK_END_SESSION_URI: https://my-bank-test.example.local/realms/my-bank-realm/protocol/openid-connect/logout
+    BANK_KEYCLOAK_REDIRECT_URI: https://my-bank-test.example.local/login/oauth2/code/{registrationId}
 
-  keycloak:
-    extraEnv:
-      - name: KC_HOSTNAME
-        value: https://my-bank-test.example.local
-      - name: KC_HOSTNAME_STRICT
-        value: "false"
-    realmImport:
-      frontUiPublicUrl: https://my-bank-test.example.local
+keycloak:
+  extraEnv:
+    - name: KC_HOSTNAME
+      value: https://my-bank-test.example.local
+    - name: KC_HOSTNAME_STRICT
+      value: "false"
+  realmImport:
+    frontUiPublicUrl: https://my-bank-test.example.local
