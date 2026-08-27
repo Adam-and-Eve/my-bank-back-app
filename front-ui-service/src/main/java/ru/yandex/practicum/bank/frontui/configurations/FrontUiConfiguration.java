@@ -14,10 +14,10 @@ public class FrontUiConfiguration {
 
     @Bean
     ResilientFactoryClient resilientFactoryClient(
-            @Value("${bank.services.front-ui-service.http-client.circuit-breaker.failure-threshold:3}") int failureThreshold,
-            @Value("${bank.services.front-ui-service.http-client.circuit-breaker.open-duration:5s}") Duration openDuration,
-            @Value("${bank.services.front-ui-service.http-client.retry.max-attempts:2}") int maxAttempts,
-            @Value("${bank.services.front-ui-service.http-client.retry.backoff:100ms}") Duration backoff
+            @Value("${bank.http-client.circuit-breaker.failure-threshold:3}") int failureThreshold,
+            @Value("${bank.http-client.circuit-breaker.open-duration:5s}") Duration openDuration,
+            @Value("${bank.http-client.retry.max-attempts:2}") int maxAttempts,
+            @Value("${bank.http-client.retry.backoff:100ms}") Duration backoff
     ) {
         return new ResilientFactoryClient(
                 failureThreshold,
