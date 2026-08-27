@@ -68,4 +68,4 @@ management:
         include: health,info
 
 server:
-  port: 8083
+  port: ${SERVER_PORT:8083}

@@ -52,4 +52,4 @@ management:
         include: health,info
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}

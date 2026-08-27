@@ -34,4 +34,4 @@ management:
         include: health,info
 
 server:
-  port: 8087
+  port: ${SERVER_PORT:8087}

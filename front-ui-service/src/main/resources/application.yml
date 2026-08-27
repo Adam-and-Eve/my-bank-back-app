@@ -47,6 +47,6 @@ management:
         include: health,info
 
 server:
-  port: 8085
+  port: ${SERVER_PORT:8085}
   tomcat:
     use-relative-redirects: true
