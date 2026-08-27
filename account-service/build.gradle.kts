@@ -6,6 +6,12 @@ plugins {
 
 contracts {
     baseClassForTests.set("ru.yandex.practicum.bank.account.contract.AccountContractBase")
+    baseClassMappings {
+        baseClassMapping(
+            ".*messaging.*",
+            "ru.yandex.practicum.bank.account.contract.AccountNotificationMessagingContractBase"
+        )
+    }
 }
 
 dependencies {
@@ -27,6 +33,7 @@ dependencies {
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.cloud.starter.contract.verifier)
+    testImplementation(libs.spring.integration.core)
     testImplementation(libs.spring.security.test)
     testRuntimeOnly(libs.h2)
     testImplementation(libs.spring.kafka.test)
