@@ -6,6 +6,8 @@ import ru.yandex.practicum.bank.transfer.exceptions.SelfTransferForbiddenExcepti
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferRequestViewModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
 
+import java.util.UUID;
+
 /**
  * <summary>
  * Контракт сервиса выполнения операций перевода денежных средств между пользователями.
@@ -30,7 +32,8 @@ public interface TransferService {
      **/
     public TransferResponseViewModel transfer(
             String senderLogin,
-            TransferRequestViewModel request);
+            TransferRequestViewModel request,
+            UUID operationId);
 
     // endregion
 }

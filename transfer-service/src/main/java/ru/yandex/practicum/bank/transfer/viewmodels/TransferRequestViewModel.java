@@ -35,4 +35,8 @@ public record TransferRequestViewModel (
         public TransferRequestViewModel(String recipientLogin, BigDecimal amount, CurrencyEnumModel currency) {
                 this(recipientLogin, amount, currency, currency);
         }
+
+        public CurrencyEnumModel resolvedTargetCurrency() {
+                return targetCurrency == null ? currency : targetCurrency;
+        }
 }

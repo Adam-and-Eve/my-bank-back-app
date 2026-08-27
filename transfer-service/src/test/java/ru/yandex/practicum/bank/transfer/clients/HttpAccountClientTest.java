@@ -10,9 +10,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.transfer.exceptions.AccountClientException;
 import ru.yandex.practicum.bank.transfer.mappers.AccountTransferMapper;
@@ -25,7 +25,6 @@ import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
@@ -84,16 +83,12 @@ public class HttpAccountClientTest {
 
         objectMapper = new ObjectMapper();
 
-        var circuitBreaker =
-                SimpleCircuitBreaker.withDefaults("accountService");
-
         accountClient = new HttpAccountClient(
                 restClientBuilder,
                 BASE_URL,
                 serviceTokenProvider,
-                circuitBreaker,
-                objectMapper,
-                accountTransferMapper
+                accountTransferMapper,
+                objectMapper
         );
     }
 
@@ -143,7 +138,7 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(TRANSFER_URI))
+        mockServer.expect(ExpectedCount.once(), requestTo(TRANSFER_URI))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(header(
                         HttpHeaders.AUTHORIZATION,
@@ -214,7 +209,7 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(TRANSFER_URI))
+        mockServer.expect(ExpectedCount.once(), requestTo(TRANSFER_URI))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withSuccess(
                         jsonResponse,
@@ -263,7 +258,7 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(TRANSFER_URI))
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(TRANSFER_URI))
                 .andExpect(method(HttpMethod.POST))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST)
                         .body(errorResponseJson)
@@ -299,7 +294,7 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        mockServer.expect(requestTo(TRANSFER_URI))
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(TRANSFER_URI))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(errorResponseJson)
                         .contentType(MediaType.APPLICATION_JSON));
@@ -307,7 +302,7 @@ public class HttpAccountClientTest {
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
                 .hasMessage(
-                        "Запрос на обслуживание учетной записи не удался."
+                        "Account service request failed"
                 );
 
         mockServer.verify();
@@ -329,7 +324,7 @@ public class HttpAccountClientTest {
         when(accountTransferMapper.toAccountRequest(operation))
                 .thenReturn(createAccountRequest());
 
-        mockServer.expect(requestTo(TRANSFER_URI))
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(TRANSFER_URI))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Internal Server Error")
                         .contentType(MediaType.TEXT_PLAIN));
@@ -337,7 +332,7 @@ public class HttpAccountClientTest {
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
                 .hasMessage(
-                        "Запрос на обслуживание учетной записи не удался."
+                        "Account service request failed"
                 );
 
         mockServer.verify();
@@ -359,7 +354,7 @@ public class HttpAccountClientTest {
         when(accountTransferMapper.toAccountRequest(operation))
                 .thenReturn(createAccountRequest());
 
-        mockServer.expect(requestTo(TRANSFER_URI))
+        mockServer.expect(ExpectedCount.manyTimes(), requestTo(TRANSFER_URI))
                 .andRespond(withException(
                         new IOException("Connection refused")
                 ));
@@ -367,7 +362,7 @@ public class HttpAccountClientTest {
         assertThatThrownBy(() -> accountClient.execute(operation))
                 .isInstanceOf(AccountClientException.class)
                 .hasMessage(
-                        "Запрос на обслуживание учетной записи не удался."
+                        "Account service request failed"
                 );
 
         mockServer.verify();
