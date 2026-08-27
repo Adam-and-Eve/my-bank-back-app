@@ -19,4 +19,4 @@ management:
       exposure:
         include: health,info
 server:
-  port: 8088
+  port: ${SERVER_PORT:8088}
