@@ -21,7 +21,7 @@ kRaft:
   controllerListenerNames: CONTROLLER
   listenerSecurityProtocolMap: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
   interBrokerListenerName: PLAINTEXT
-  controllerQuorumVoters: 1@kafka:9093
+  controllerQuorumVoters:  1@kafka-0.kafka-headless:9093
   offsetsTopicReplicationFactor: 1
   transactionStateLogReplicationFactor: 1
   transactionStateLogMinIsr: 1
