@@ -5,7 +5,7 @@ plugins {
 }
 
 contracts {
-    baseClassForTests.set("ru.yandex.practicum.bank.notification.contract.NotificationContractBase")
+    baseClassForTests.set("ru.yandex.practicum.bank.notification.contract.NotificationMessagingContractBase")
 }
 
 dependencies {
@@ -13,6 +13,7 @@ dependencies {
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.validation)
     implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.spring.boot.starter.json)
     implementation(libs.spring.boot.starter.oauth2.resource.server)
 
     implementation(libs.spring.kafka)
