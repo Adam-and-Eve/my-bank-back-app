@@ -12,7 +12,6 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import ru.yandex.practicum.bank.shared.clients.ResilientExecutorClient;
 import ru.yandex.practicum.bank.shared.clients.ResilientFactoryClient;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
 import ru.yandex.practicum.bank.shared.viewmodels.ApiErrorResponseViewModel;
 import ru.yandex.practicum.bank.transfer.exceptions.AccountClientException;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferExecutor;

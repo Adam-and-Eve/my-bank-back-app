@@ -4,14 +4,6 @@ x-app-health: &app-health
   retries: 12
   start_period: 30s
 
-
-x-platform-health: &platform-health
-  interval: 10s
-  timeout: 5s
-  retries: 12
-  start_period: 20s
-
-
 x-keycloak-env: &keycloak-env
   KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
   KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
@@ -29,15 +21,48 @@ x-keycloak-env: &keycloak-env
   BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET}
   BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET}
 
+
+x-jenkins-env: &jenkins-env
+  JENKINS_ADMIN_ID: admin
+  JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD}
+
+x-kafka-producer-env: &kafka-producer-env
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: ${SPRING_KAFKA_BOOTSTRAP_SERVERS}
+  BANK_KAFKA_NOTIFICATION_TOPIC: ${BANK_KAFKA_NOTIFICATION_TOPIC}
+
+x-kafka-env: &kafka-env
+  CLUSTER_ID: ${KAFKA_CLUSTER_ID}
+  KAFKA_NODE_ID: ${KAFKA_NODE_ID}
+  KAFKA_PROCESS_ROLES: ${KAFKA_PROCESS_ROLES}
+  KAFKA_LISTENERS: ${KAFKA_LISTENERS}
+  KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS}
+  KAFKA_CONTROLLER_LISTENER_NAMES: ${KAFKA_CONTROLLER_LISTENER_NAMES}
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
+  KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
+  KAFKA_CONTROLLER_QUORUM_VOTERS: ${KAFKA_CONTROLLER_QUORUM_VOTERS}
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR}
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${KAFKA_TRANSACTION_STATE_LOG_MIN_ISR}
+  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: ${KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS}
+  KAFKA_NUM_PARTITIONS: ${KAFKA_NUM_PARTITIONS}
+  KAFKA_AUTO_CREATE_TOPICS_ENABLE: ${KAFKA_AUTO_CREATE_TOPICS_ENABLE}
+  KAFKA_LOG_DIRS: ${KAFKA_LOG_DIRS}
+
 x-notification-service-env: &notification-service-env
-  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_USER_INFO_URI}
+  <<: *kafka-producer-env
+
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
   BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
   BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET}
+
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
+
   SERVER_PORT: "8084"
 
-
 x-transfer-service-env: &transfer-service-env
-  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_USER_INFO_URI}
+  <<: *kafka-producer-env
+
+  BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
   BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
   BANK_KEYCLOAK_TOKEN_URI: ${BANK_KEYCLOAK_TOKEN_URI}
 
@@ -47,10 +72,14 @@ x-transfer-service-env: &transfer-service-env
   BANK_SERVICES_BLOCKER_SERVICE_BASE_URL: ${BANK_SERVICES_BLOCKER_SERVICE_BASE_URL}
   BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL}
 
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
+
   SERVER_PORT: "8083"
 
 
 x-cash-service-env: &cash-service-env
+  <<: *kafka-producer-env
+
   BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
   BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
   BANK_KEYCLOAK_TOKEN_URI: ${BANK_KEYCLOAK_TOKEN_URI}
@@ -61,10 +90,14 @@ x-cash-service-env: &cash-service-env
   BANK_SERVICES_BLOCKER_SERVICE_BASE_URL: ${BANK_SERVICES_BLOCKER_SERVICE_BASE_URL}
   BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL}
 
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
+
   SERVER_PORT: "8082"
 
 
 x-account-service-env: &account-service-env
+  <<: *kafka-producer-env
+
   BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
   BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
 
@@ -72,6 +105,8 @@ x-account-service-env: &account-service-env
   BANK_DATASOURCE_USERNAME: postgres
 
   BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET: ${BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET}
+
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
 
   SERVER_PORT: "8081"
 
@@ -93,12 +128,16 @@ x-front-ui-service-env: &front-ui-service-env
   BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL}
   BANK_SERVICES_TRANSFER_SERVICE_BASE_URL: ${BANK_SERVICES_TRANSFER_SERVICE_BASE_URL}
 
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
+
   SERVER_PORT: "8085"
 
 
 x-exchange-service-env: &exchange-service-env
   BANK_KEYCLOAK_ISSUER_URI: ${BANK_KEYCLOAK_ISSUER_URI}
   BANK_KEYCLOAK_JWK_SET_URI: ${BANK_KEYCLOAK_JWK_SET_URI}
+
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
 
   SERVER_PORT: "8086"
 
@@ -114,6 +153,8 @@ x-exchange-generator-service-env: &exchange-generator-service-env
   BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL}
   BANK_SERVICES_EXCHANGE_GENERATOR_SERVICES_FIXED_DELAY_MS: ${BANK_SERVICES_EXCHANGE_GENERATOR_SERVICES_FIXED_DELAY_MS}
 
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
+
   SERVER_PORT: "8087"
 
 
@@ -123,12 +164,9 @@ x-blocker-service-env: &blocker-service-env
 
   BANK_SERVICES_BLOCKER_SERVICE_MAX_AMOUNT: ${BANK_SERVICES_BLOCKER_SERVICE_MAX_AMOUNT}
 
+  LOGGING_LEVEL_ROOT: ${LOGGING_LEVEL_ROOT}
+
   SERVER_PORT: "8088"
-
-x-jenkins-env: &jenkins-env
-  JENKINS_ADMIN_ID: admin
-  JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD}
-
 
 services:
   postgres:
@@ -172,16 +210,35 @@ services:
       - ${BANK_KEYCLOAK_REALM_DIRECTORY}:/opt/keycloak/data/import:ro
     networks: [ bank-network ]
 
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: kafka
+    restart: unless-stopped
+    profiles:
+      - infra
+      - app
+      - deploy
+    environment:
+      <<: *kafka-env
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks: [ bank-network ]
+
+
   notification-service:
     build:
       context: ./notification-service
     image: my-bank-notification-service:${IMAGE_TAG:-local}
     container_name: notification-service
+    restart: unless-stopped
     profiles:
       - app
       - deploy
     environment:
       <<: *notification-service-env
+    depends_on:
+      kafka:
+        condition: service_started
     healthcheck:
       <<: *app-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8084'" ]
@@ -197,6 +254,9 @@ services:
       - deploy
     environment:
       <<: *exchange-service-env
+    depends_on:
+      keycloak:
+        condition: service_healthy
     healthcheck:
       <<: *app-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8086'" ]
@@ -213,6 +273,8 @@ services:
     environment:
       <<: *exchange-generator-service-env
     depends_on:
+      keycloak:
+        condition: service_healthy
       exchange-service:
         condition: service_healthy
     healthcheck:
@@ -243,12 +305,17 @@ services:
       context: ./cash-service
     image: my-bank-cash-service:${IMAGE_TAG:-local}
     container_name: cash-service
+    restart: unless-stopped
     profiles:
       - app
       - deploy
     environment:
       <<: *cash-service-env
     depends_on:
+      kafka:
+        condition: service_started
+      account-service:
+        condition: service_healthy
       blocker-service:
         condition: service_healthy
     healthcheck:
@@ -261,13 +328,20 @@ services:
       context: ./transfer-service
     image: my-bank-transfer-service:${IMAGE_TAG:-local}
     container_name: transfer-service
+    restart: unless-stopped
     profiles:
       - app
       - deploy
     environment:
       <<: *transfer-service-env
     depends_on:
+      kafka:
+        condition: service_started
+      account-service:
+        condition: service_healthy
       exchange-generator-service:
+        condition: service_healthy
+      exchange-service:
         condition: service_healthy
       blocker-service:
         condition: service_healthy
@@ -281,16 +355,19 @@ services:
       context: ./account-service
     image: my-bank-account-service:${IMAGE_TAG:-local}
     container_name: account-service
+    restart: unless-stopped
     profiles:
       - app
       - deploy
     environment:
       <<: *account-service-env
     depends_on:
-      cash-service:
+      keycloak:
         condition: service_healthy
-      transfer-service:
+      postgres:
         condition: service_healthy
+      kafka:
+        condition: service_started
     healthcheck:
       <<: *app-health
       test: [ "CMD-SHELL", "bash -ec '</dev/tcp/127.0.0.1/8081'" ]
@@ -309,6 +386,8 @@ services:
     ports:
       - "8085:8085"
     depends_on:
+      keycloak:
+        condition: service_healthy
       account-service:
         condition: service_healthy
       cash-service:
@@ -346,8 +425,8 @@ services:
     container_name: jenkins
 
     profiles:
-      - ci
       - deploy
+      - ci
 
     environment:
       <<: *jenkins-env
@@ -365,6 +444,7 @@ services:
 
 volumes:
   postgres-data:
+  kafka-data:
   jenkins-data:
 
 networks:
