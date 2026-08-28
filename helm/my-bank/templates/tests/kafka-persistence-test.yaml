@@ -12,7 +12,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: {{ include "bank.fullname" . }}-kafka-persistence-test
+  name: {{ include "my-bank.fullname" . }}-kafka-persistence-test
   annotations:
     "helm.sh/hook": test
     "helm.sh/hook-weight": "10"
