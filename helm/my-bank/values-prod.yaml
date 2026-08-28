@@ -1,10 +1,10 @@
 global:
   namespace: prod
   imageTag: stable
-  publicBaseUrl: https://my-bank.example.local
-  keycloakPublicUrl: https://my-bank.example.local/realms/my-bank-realm
+  publicBaseUrl: http://localhost:8080
+  keycloakPublicUrl: http://localhost:8080/realms/my-bank-realm
   env:
-    BANK_KEYCLOAK_ISSUER_URI: https://my-bank.example.local/realms/my-bank-realm
+    BANK_KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/my-bank-realm
 
 gatewayApi:
   listener:
@@ -15,16 +15,16 @@ kafka:
 
 front-ui-service:
   env:
-    BANK_KEYCLOAK_AUTHORIZATION_URI: https://my-bank.example.local/realms/my-bank-realm/protocol/openid-connect/auth
-    BANK_KEYCLOAK_END_SESSION_URI: https://my-bank.example.local/realms/my-bank-realm/protocol/openid-connect/logout
-    BANK_KEYCLOAK_REDIRECT_URI: https://my-bank.example.local/login/oauth2/code/{registrationId}
+    BANK_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/auth
+    BANK_KEYCLOAK_END_SESSION_URI: http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/logout
+    BANK_KEYCLOAK_REDIRECT_URI: http://localhost:8080/login/oauth2/code/{registrationId}
 
 keycloak:
   extraEnv:
     - name: KC_HOSTNAME
-      value: https://my-bank.example.local
+      value: http://localhost:8080
 
     - name: KC_HOSTNAME_STRICT
       value: "false"
   realmImport:
-    frontUiPublicUrl: https://my-bank.example.local
+    frontUiPublicUrl: http://localhost:8080
