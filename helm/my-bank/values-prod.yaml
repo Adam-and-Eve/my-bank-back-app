@@ -8,7 +8,7 @@ global:
 
 gatewayApi:
   listener:
-    hostname: my-bank.example.local
+    hostname: localhost
 
 kafka:
   clusterId: Hz5JRp00D1iXfKZoXfO-k
