@@ -1,14 +1,42 @@
 spring:
   application:
     name: notification-service
+  main:
+    web-application-type: ${SPRING_MAIN_WEB_APPLICATION_TYPE:servlet}
   jackson:
     default-property-inclusion: non_null
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${BANK_KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/my-bank-realm}
-          jwk-set-uri: ${BANK_KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/certs}
+  kafka:
+    admin:
+      fail-fast: true
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:bank-notification}
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: ru.yandex.practicum.bank.shared.models.NotificationEventModel
+        spring.json.trusted.packages: ru.yandex.practicum.bank.shared
+    listener:
+      ack-mode: record
+      observation-enabled: true
+
+bank:
+  kafka:
+    notification-dlt-topic: ${BANK_KAFKA_NOTIFICATION_DLT_TOPIC:bank.notification.dlt}
+    notification-dlt-partitions: ${BANK_KAFKA_NOTIFICATION_DLT_PARTITIONS:3}
+    notification-dlt-retention-ms: ${BANK_KAFKA_NOTIFICATION_DLT_RETENTION_MS:604800000}
+    notification-partitions: ${BANK_KAFKA_NOTIFICATION_PARTITIONS:3}
+    notification-replication-factor: ${BANK_KAFKA_NOTIFICATION_REPLICATION_FACTOR:1}
+    notification-topic: ${BANK_KAFKA_NOTIFICATION_TOPIC:bank.notification}
+  services:
+    blocker-service:
+      base-url: ${BANK_SERVICES_BLOCKER_SERVICE_BASE_URL:http://blocker-service:8088}
+    exchange-service:
+      base-url: ${BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL:http://exchange-service:8086}
 
 management:
   endpoints:
@@ -17,4 +45,4 @@ management:
         include: health,info
 
 server:
-  port: 8084
+  port: ${SERVER_PORT:8089}

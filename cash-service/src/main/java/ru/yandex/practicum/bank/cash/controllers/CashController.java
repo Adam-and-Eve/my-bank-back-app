@@ -4,11 +4,14 @@ import jakarta.validation.Valid;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.bank.cash.exceptions.MissingPreferredUsernameException;
 import ru.yandex.practicum.bank.cash.interfaces.CashService;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
+
+import java.util.UUID;
 
 /**
  * <summary>
@@ -19,6 +22,12 @@ import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
  **/
 @RestController
 public class CashController {
+
+    // region Constants
+
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+
+    // endregion
 
     // region Fields
 
@@ -49,9 +58,10 @@ public class CashController {
     @PostMapping("/api/cash/deposit")
     public CashOperationResponseViewModel deposit(
             JwtAuthenticationToken authentication,
+            @RequestHeader(IDEMPOTENCY_KEY_HEADER) UUID idempotencyKey,
             @Valid @RequestBody CashOperationRequestViewModel request
     ) {
-        return cashService.deposit(getLogin(authentication), request);
+        return cashService.deposit(getLogin(authentication), request, idempotencyKey);
     }
 
     /**
@@ -67,9 +77,10 @@ public class CashController {
     @PostMapping("/api/cash/withdraw")
     public CashOperationResponseViewModel withdraw(
             JwtAuthenticationToken authentication,
+            @RequestHeader(IDEMPOTENCY_KEY_HEADER) UUID idempotencyKey,
             @Valid @RequestBody CashOperationRequestViewModel request
     ) {
-        return cashService.withdraw(getLogin(authentication), request);
+        return cashService.withdraw(getLogin(authentication), request, idempotencyKey);
     }
 
     // endregion

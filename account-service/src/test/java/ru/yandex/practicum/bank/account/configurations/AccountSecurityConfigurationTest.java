@@ -47,13 +47,9 @@ public class AccountSecurityConfigurationTest {
     // region Constants
 
     private static final String ME_URL = "/api/account/me";
-
     private static final String RECIPIENTS_URL = "/api/account/recipients";
-
     private static final String INTERNAL_BALANCE_DEPOSIT_URL = "/api/account/internal/balance/deposit";
-
     private static final String HEALTH_URL = "/actuator/health";
-
     private static final String UNKNOWN_URL = "/api/account/unknown";
 
     private static final String UPDATE_ME_REQUEST_BODY = """
@@ -153,7 +149,7 @@ public class AccountSecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет успешную обработку получения профиля (200 OK) при наличии ролей ROLE_USER и ROLE_ACCOUNT_READ.
+     * Проверяет успешную обработку получения профиля (200 OK) при наличии требуемых ролей (ROLE_USER и ROLE_ACCOUNT_READ).
      * </summary>
      **/
     @Test
@@ -180,7 +176,7 @@ public class AccountSecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет успешный доступ к получению списка получателей переводов при наличии ролей ROLE_USER и ROLE_ACCOUNT_READ.
+     * Проверяет успешный доступ к получению списка получателей переводов при наличии требуемых ролей.
      * </summary>
      **/
     @Test
@@ -214,7 +210,8 @@ public class AccountSecurityConfigurationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(UPDATE_ME_REQUEST_BODY))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Недостаточно прав для выполнения операции"));
     }
 
     /**
@@ -275,6 +272,7 @@ public class AccountSecurityConfigurationTest {
     /**
      * <summary>
      * Проверяет работу кастомного JwtAuthenticationConverter при извлечении ролей из realm_access claim.
+     * Убеждается, что к ролям корректно добавляется префикс ROLE_.
      * </summary>
      **/
     @Test
@@ -311,7 +309,8 @@ public class AccountSecurityConfigurationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("Недостаточно прав для выполнения операции"));
     }
 
     // endregion

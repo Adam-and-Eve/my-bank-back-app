@@ -32,5 +32,8 @@ dependencies:
 - name: keycloak
   repository: file://../charts/keycloak
   version: 0.1.0
-digest: sha256:7eaa6789c991d2b0c9dd9b779cb45545c41c9d4abd40de7a3713d112720d8640
-generated: "2026-08-21T13:48:18.4724624+03:00"
+- name: kafka
+  repository: file://../charts/kafka
+  version: 0.1.0
+digest: sha256:af95e6770ddcf106a576928ef3abbdcb84bf6787f06ecaed6a6724264cff8a91
+generated: "2026-08-27T16:15:06.6414122-04:00"

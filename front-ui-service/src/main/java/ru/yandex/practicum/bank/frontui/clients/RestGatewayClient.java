@@ -1,6 +1,8 @@
 package ru.yandex.practicum.bank.frontui.clients;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
@@ -9,14 +11,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import ru.yandex.practicum.bank.frontui.exceptions.GatewayClientException;
-import ru.yandex.practicum.bank.frontui.exceptions.GatewayExceptionHandler;
 import ru.yandex.practicum.bank.frontui.exceptions.RestGatewayClientException;
 import ru.yandex.practicum.bank.frontui.interfaces.GatewayClient;
 import ru.yandex.practicum.bank.frontui.mappers.GatewayRequestMapper;
 import ru.yandex.practicum.bank.frontui.viewmodels.*;
 import ru.yandex.practicum.bank.shared.clients.ResilientExecutorClient;
 import ru.yandex.practicum.bank.shared.clients.ResilientFactoryClient;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
 import ru.yandex.practicum.bank.shared.viewmodels.ExchangeRateResponseViewModel;
 
 import java.io.IOException;
@@ -47,6 +47,8 @@ public class RestGatewayClient implements GatewayClient {
     private final GatewayRequestMapper gatewayRequestMapper;
 
     private final ObjectMapper objectMapper;
+
+    private static final Logger log = LoggerFactory.getLogger(RestGatewayClient.class);
 
     // endregion
 
@@ -153,6 +155,10 @@ public class RestGatewayClient implements GatewayClient {
             String accessToken,
             TransferFormViewModel form) {
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Gateway client request prepared operationType=TRANSFER source=front-ui-service targetService=api-gateway");
+            }
+
             return transferClient.post()
                     .uri("/api/transfer")
                     .headers(headers -> {
@@ -164,6 +170,11 @@ public class RestGatewayClient implements GatewayClient {
                     .onStatus(HttpStatusCode::isError, (request, response) -> handleError(response))
                     .body(TransferResponseViewModel.class);
         } catch (RestClientException exception) {
+            log.error(
+                    "Gateway client request failed operationType=TRANSFER status=error errorCategory=downstream_unavailable errorType={} source=front-ui-service targetService=api-gateway",
+                    exception.getClass().getSimpleName()
+            );
+
             throw new GatewayClientException("Gateway request failed", exception);
         }
     }
@@ -199,6 +210,10 @@ public class RestGatewayClient implements GatewayClient {
      **/
     private List<ExchangeRateResponseViewModel> getExchangeRatesWithoutCircuitBreaker(String accessToken) {
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Gateway client request prepared operationType=LOAD_EXCHANGE_RATES source=front-ui-service targetService=api-gateway");
+            }
+
             ExchangeRateResponseViewModel[] rates = exchangeClient.get()
                     .uri("/api/exchange/rates")
                     .headers(headers -> headers.setBearerAuth(accessToken))
@@ -207,6 +222,11 @@ public class RestGatewayClient implements GatewayClient {
                     .body(ExchangeRateResponseViewModel[].class);
             return rates == null ? List.of() : Arrays.asList(rates);
         } catch (RestClientException exception) {
+            log.error(
+                    "Gateway client request failed operationType=LOAD_EXCHANGE_RATES status=error errorCategory=downstream_unavailable errorType={} source=front-ui-service targetService=api-gateway",
+                    exception.getClass().getSimpleName()
+            );
+
             throw new GatewayClientException("Gateway request failed", exception);
         }
     }
@@ -220,6 +240,10 @@ public class RestGatewayClient implements GatewayClient {
      **/
     private AccountResponseViewModel getAccountWithoutCircuitBreaker(String accessToken) {
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Gateway client request prepared operationType=LOAD_ACCOUNT source=front-ui-service targetService=api-gateway");
+            }
+
             return accountClient.get()
                     .uri("/api/account/me")
                     .headers(headers -> headers.setBearerAuth(accessToken))
@@ -227,6 +251,11 @@ public class RestGatewayClient implements GatewayClient {
                     .onStatus(HttpStatusCode::isError, (request, response) -> handleError(response))
                     .body(AccountResponseViewModel.class);
         } catch (RestClientException exception) {
+            log.error(
+                    "Gateway client request failed operationType=LOAD_ACCOUNT status=error errorCategory=downstream_unavailable errorType={} source=front-ui-service targetService=api-gateway",
+                    exception.getClass().getSimpleName()
+            );
+
             throw new GatewayClientException("Gateway request failed", exception);
         }
     }
@@ -257,6 +286,10 @@ public class RestGatewayClient implements GatewayClient {
             String accessToken,
             AccountFormViewModel form) {
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Gateway client request prepared operationType=UPDATE_PROFILE source=front-ui-service targetService=api-gateway");
+            }
+
             return accountClient.put()
                     .uri("/api/account/me")
                     .headers(headers -> headers.setBearerAuth(accessToken))
@@ -265,6 +298,11 @@ public class RestGatewayClient implements GatewayClient {
                     .onStatus(HttpStatusCode::isError, (request, response) -> handleError(response))
                     .body(AccountResponseViewModel.class);
         } catch (RestClientException exception) {
+            log.error(
+                    "Gateway client request failed operationType=UPDATE_PROFILE status=error errorCategory=downstream_unavailable errorType={} source=front-ui-service targetService=api-gateway",
+                    exception.getClass().getSimpleName()
+            );
+
             throw new GatewayClientException("Gateway request failed", exception);
         }
     }
@@ -289,6 +327,10 @@ public class RestGatewayClient implements GatewayClient {
      **/
     private List<RecipientResponseViewModel> getRecipientsWithoutCircuitBreaker(String accessToken) {
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Gateway client request prepared operationType=LOAD_RECIPIENTS source=front-ui-service targetService=api-gateway");
+            }
+
             RecipientResponseViewModel[] recipients = accountClient.get()
                     .uri("/api/account/recipients")
                     .headers(headers -> headers.setBearerAuth(accessToken))
@@ -298,6 +340,11 @@ public class RestGatewayClient implements GatewayClient {
 
             return recipients == null ? List.of() : Arrays.asList(recipients);
         } catch (RestClientException exception) {
+            log.error(
+                    "Gateway client request failed operationType=LOAD_RECIPIENTS status=error errorCategory=downstream_unavailable errorType={} source=front-ui-service targetService=api-gateway",
+                    exception.getClass().getSimpleName()
+            );
+
             throw new GatewayClientException("Gateway request failed", exception);
         }
     }
@@ -415,6 +462,11 @@ public class RestGatewayClient implements GatewayClient {
         if (exception instanceof GatewayClientException gatewayClientException) {
             throw gatewayClientException;
         }
+
+        log.error(
+                "Gateway client retries exhausted status=error errorCategory=downstream_unavailable errorType={} source=front-ui-service targetService=api-gateway",
+                exception.getClass().getSimpleName()
+        );
 
         throw new GatewayClientException("Банковские сервисы временно недоступны", exception);
     }

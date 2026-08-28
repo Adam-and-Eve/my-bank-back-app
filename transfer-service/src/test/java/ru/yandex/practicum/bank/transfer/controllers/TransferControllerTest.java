@@ -15,6 +15,7 @@ import ru.yandex.practicum.bank.transfer.viewmodels.TransferRequestViewModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -26,11 +27,13 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 /**
  * <summary>
  * Модульные тесты REST-контроллера переводов TransferController.
- * Проверяют обработку HTTP POST-запросов, извлечение логина (preferred_username) из JWT-токена,
- * передачу параметров в TransferService и обработку граничных случаев с отсутствующими авторизационными данными.
+ * Проверяют обработку HTTP POST-запросов, передачу ключа идемпотентности,
+ * извлечение логина (preferred_username) из JWT-токена, передачу параметров в TransferService
+ * и обработку граничных случаев с отсутствующими данными.
  * </summary>
  **/
 @WebMvcTest(TransferController.class)
@@ -40,6 +43,8 @@ public class TransferControllerTest {
     // region Constants
 
     private static final String TRANSFER_ENDPOINT = "/api/transfer";
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+    private static final UUID TEST_IDEMPOTENCY_KEY = UUID.fromString("123e4567-e89b-12d3-a456-426614174000");
 
     // endregion
 
@@ -57,8 +62,8 @@ public class TransferControllerTest {
 
     /**
      * <summary>
-     * Проверяет успешную обработку запроса перевода с корректным JWT-токеном
-     * и вызов бизнес-сервиса с логином пользователя и параметрами перевода.
+     * Проверяет успешную обработку запроса перевода с корректным JWT-токеном,
+     * ключом идемпотентности и вызов бизнес-сервиса с логином пользователя и параметрами перевода.
      * </summary>
      **/
     @Test
@@ -71,10 +76,11 @@ public class TransferControllerTest {
                 "Transfer completed"
         );
 
-        when(transferService.transfer(eq("dmitry"), any(TransferRequestViewModel.class)))
+        when(transferService.transfer(eq("dmitry"), any(TransferRequestViewModel.class), eq(TEST_IDEMPOTENCY_KEY)))
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "dmitry"))
@@ -90,30 +96,25 @@ public class TransferControllerTest {
                 .andExpect(jsonPath("$.currency").value("RUB"))
                 .andExpect(jsonPath("$.message").value("Transfer completed"));
 
-        var requestCaptor =
-                org.mockito.ArgumentCaptor.forClass(TransferRequestViewModel.class);
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(TransferRequestViewModel.class);
 
         verify(transferService).transfer(
                 eq("dmitry"),
-                requestCaptor.capture()
+                requestCaptor.capture(),
+                eq(TEST_IDEMPOTENCY_KEY)
         );
 
         var request = requestCaptor.getValue();
 
-        assertThat(request.recipientLogin())
-                .isEqualTo("alexey");
+        assertThat(request.recipientLogin()).isEqualTo("alexey");
 
-        assertThat(request.amount())
-                .isEqualByComparingTo("200.00");
+        assertThat(request.amount()).isEqualByComparingTo("200.00");
 
-        assertThat(request.currency())
-                .isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(request.currency()).isEqualTo(CurrencyEnumModel.RUB);
 
-        assertThat(request.targetCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(request.targetCurrency()).isEqualTo(CurrencyEnumModel.RUB);
 
-        assertThat(request.resolvedTargetCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(request.resolvedTargetCurrency()).isEqualTo(CurrencyEnumModel.RUB);
     }
 
     /**
@@ -131,10 +132,11 @@ public class TransferControllerTest {
                 "Transfer completed"
         );
 
-        when(transferService.transfer(eq("dmitry"), any(TransferRequestViewModel.class)))
+        when(transferService.transfer(eq("dmitry"), any(TransferRequestViewModel.class), eq(TEST_IDEMPOTENCY_KEY)))
                 .thenReturn(expectedResponse);
 
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "dmitry"))
@@ -150,30 +152,46 @@ public class TransferControllerTest {
                 .andExpect(jsonPath("$.currency").value("USD"))
                 .andExpect(jsonPath("$.message").value("Transfer completed"));
 
-        var requestCaptor =
-                org.mockito.ArgumentCaptor.forClass(TransferRequestViewModel.class);
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(TransferRequestViewModel.class);
 
         verify(transferService).transfer(
                 eq("dmitry"),
-                requestCaptor.capture()
+                requestCaptor.capture(),
+                eq(TEST_IDEMPOTENCY_KEY)
         );
 
         var request = requestCaptor.getValue();
 
-        assertThat(request.recipientLogin())
-                .isEqualTo("alexey");
+        assertThat(request.recipientLogin()).isEqualTo("alexey");
 
-        assertThat(request.amount())
-                .isEqualByComparingTo("200.00");
+        assertThat(request.amount()).isEqualByComparingTo("200.00");
 
-        assertThat(request.currency())
-                .isEqualTo(CurrencyEnumModel.USD);
+        assertThat(request.currency()).isEqualTo(CurrencyEnumModel.USD);
 
-        assertThat(request.targetCurrency())
-                .isEqualTo(CurrencyEnumModel.CNY);
+        assertThat(request.targetCurrency()).isEqualTo(CurrencyEnumModel.CNY);
 
-        assertThat(request.resolvedTargetCurrency())
-                .isEqualTo(CurrencyEnumModel.CNY);
+        assertThat(request.resolvedTargetCurrency()).isEqualTo(CurrencyEnumModel.CNY);
+    }
+
+    /**
+     * <summary>
+     * Проверяет возврат ошибки 400 Bad Request, если заголовок Idempotency-Key отсутствует.
+     * </summary>
+     **/
+    @Test
+    public void shouldReturnBadRequestWhenIdempotencyKeyIsMissing() throws Exception {
+        mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .with(csrf())
+                        .with(jwt().jwt(jwt ->
+                                        jwt.claim("preferred_username", "dmitry"))
+                                .authorities(
+                                        new SimpleGrantedAuthority("ROLE_TRANSFER_WRITE")
+                                ))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validTransferRequest()))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(transferService);
     }
 
     /**
@@ -185,6 +203,7 @@ public class TransferControllerTest {
     @Test
     public void shouldThrowExceptionWhenPreferredUsernameIsMissing() throws Exception {
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("email", "dmitry@example.com"))
@@ -208,6 +227,7 @@ public class TransferControllerTest {
     @Test
     public void shouldThrowExceptionWhenPreferredUsernameIsBlank() throws Exception {
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "   "))
@@ -240,6 +260,7 @@ public class TransferControllerTest {
                 """;
 
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "dmitry"))
@@ -269,6 +290,7 @@ public class TransferControllerTest {
                 """;
 
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "dmitry"))
@@ -298,6 +320,7 @@ public class TransferControllerTest {
                 """;
 
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "dmitry"))
@@ -328,6 +351,7 @@ public class TransferControllerTest {
                 """;
 
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "dmitry"))
@@ -348,10 +372,8 @@ public class TransferControllerTest {
      * </summary>
      **/
     @Test
-    public void shouldUseSourceCurrencyAsTargetCurrencyWhenTargetCurrencyIsMissing()
-            throws Exception {
-
-        when(transferService.transfer(eq("dmitry"), any(TransferRequestViewModel.class)))
+    public void shouldUseSourceCurrencyAsTargetCurrencyWhenTargetCurrencyIsMissing() throws Exception {
+        when(transferService.transfer(eq("dmitry"), any(TransferRequestViewModel.class), eq(TEST_IDEMPOTENCY_KEY)))
                 .thenReturn(new TransferResponseViewModel(
                         "dmitry",
                         "alexey",
@@ -361,6 +383,7 @@ public class TransferControllerTest {
                 ));
 
         mockMvc.perform(post(TRANSFER_ENDPOINT)
+                        .header(IDEMPOTENCY_KEY_HEADER, TEST_IDEMPOTENCY_KEY.toString())
                         .with(csrf())
                         .with(jwt().jwt(jwt ->
                                         jwt.claim("preferred_username", "dmitry"))
@@ -371,24 +394,19 @@ public class TransferControllerTest {
                         .content(validTransferRequest()))
                 .andExpect(status().isOk());
 
-        var requestCaptor =
-                org.mockito.ArgumentCaptor.forClass(TransferRequestViewModel.class);
+        var requestCaptor = org.mockito.ArgumentCaptor.forClass(TransferRequestViewModel.class);
 
         verify(transferService).transfer(
                 eq("dmitry"),
-                requestCaptor.capture()
+                requestCaptor.capture(),
+                eq(TEST_IDEMPOTENCY_KEY)
         );
 
         var request = requestCaptor.getValue();
 
-        assertThat(request.currency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        assertThat(request.targetCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
-
-        assertThat(request.resolvedTargetCurrency())
-                .isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(request.currency()).isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(request.targetCurrency()).isEqualTo(CurrencyEnumModel.RUB);
+        assertThat(request.resolvedTargetCurrency()).isEqualTo(CurrencyEnumModel.RUB);
     }
 
     // endregion
@@ -399,9 +417,7 @@ public class TransferControllerTest {
      * <summary>
      * Формирует JSON-запрос на перевод в одной валюте.
      * </summary>
-     * <return>
      * @return JSON-строка TransferRequestViewModel.
-     * </return>
      **/
     private String validTransferRequest() {
         return """
@@ -417,9 +433,7 @@ public class TransferControllerTest {
      * <summary>
      * Формирует JSON-запрос на перевод с отдельной целевой валютой.
      * </summary>
-     * <return>
      * @return JSON-строка TransferRequestViewModel с targetCurrency.
-     * </return>
      **/
     private String validTransferRequestWithTargetCurrency() {
         return """

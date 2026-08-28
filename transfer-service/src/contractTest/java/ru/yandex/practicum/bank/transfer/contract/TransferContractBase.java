@@ -13,6 +13,7 @@ import ru.yandex.practicum.bank.transfer.exceptions.TransferExceptionHandler;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -20,15 +21,31 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
+/**
+ * <summary>
+ * Базовый класс для контрактных тестов (Spring Cloud Contract) сервиса переводов.
+ * Инициализирует автономное окружение RestAssuredMockMvc с заслепленным сервисом TransferService
+ * и предустановленным авторизованным принципалом.
+ * </summary>
+ **/
 public class TransferContractBase {
 
+    // region Setup
+
+    /**
+     * <summary>
+     * Подготавливает тестовый контекст RestAssuredMockMvc перед выполнением каждого контрактного теста.
+     * Настраивает мок-поведение для операций перевода, регистрирует глобальный обработчик ошибок
+     * и подставляет тестовый JWT-токен пользователя по умолчанию.
+     * </summary>
+     **/
     @BeforeEach
     void setUp() {
         var transferService = mock(TransferService.class);
-        when(transferService.transfer(eq("dmitry"), any(TransferRequestViewModel.class)))
+        when(transferService.transfer(eq("alexey"), any(TransferRequestViewModel.class), any(UUID.class)))
                 .thenReturn(new TransferResponseViewModel(
-                        "dmitry",
                         "alexey",
+                        "dmitry",
                         new BigDecimal("850.00"),
                         "RUB",
                         "Transfer completed"
@@ -36,19 +53,32 @@ public class TransferContractBase {
 
         var mockMvc = MockMvcBuilders.standaloneSetup(new TransferController(transferService))
                 .setControllerAdvice(new TransferExceptionHandler())
-                .defaultRequest(get("/").principal(jwtAuthentication("dmitry")))
+                .defaultRequest(get("/").principal(jwtAuthentication("alexey")))
                 .build();
 
         RestAssuredMockMvc.mockMvc(mockMvc);
     }
 
+    // endregion
+
+    // region Methods
+
+    /**
+     * <summary>
+     * Генерирует объект JwtAuthenticationToken с указанным логином пользователя в claim preferred_username.
+     * </summary>
+     * @param login Логин пользователя для подстановки в JWT-токен.
+     * @return Сформированный экземпляр JwtAuthenticationToken.
+     **/
     private JwtAuthenticationToken jwtAuthentication(String login) {
         var jwt = Jwt.withTokenValue("token")
                 .header("alg", "none")
-                .issuedAt(Instant.parse("2026-06-13T00:00:00Z"))
+                .issuedAt(Instant.parse("2026-08-27T00:00:00Z"))
                 .claim("preferred_username", login)
                 .build();
 
         return new JwtAuthenticationToken(jwt);
     }
+
+    // endregion
 }

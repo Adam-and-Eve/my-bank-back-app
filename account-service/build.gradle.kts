@@ -6,6 +6,12 @@ plugins {
 
 contracts {
     baseClassForTests.set("ru.yandex.practicum.bank.account.contract.AccountContractBase")
+    baseClassMappings {
+        baseClassMapping(
+            ".*messaging.*",
+            "ru.yandex.practicum.bank.account.contract.AccountNotificationMessagingContractBase"
+        )
+    }
 }
 
 dependencies {
@@ -16,14 +22,19 @@ dependencies {
     implementation(libs.spring.boot.starter.actuator)
     implementation(libs.spring.boot.starter.aop)
     implementation(libs.spring.boot.starter.oauth2.resource.server)
+    implementation(libs.datasource.micrometer.spring.boot)
     implementation(libs.spring.retry)
+    implementation(libs.spring.kafka)
 
     implementation(libs.flyway.core)
     runtimeOnly(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
 
+
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.cloud.starter.contract.verifier)
+    testImplementation(libs.spring.integration.core)
     testImplementation(libs.spring.security.test)
     testRuntimeOnly(libs.h2)
+    testImplementation(libs.spring.kafka.test)
 }

@@ -41,7 +41,7 @@ spec:
                   key: {{ required "admin.passwordKey is required" .Values.admin.passwordKey }}
 
             {{- if .Values.realmImport.enabled }}
-            - name: BANK_SERVICES_FRONT_UI_SERVICE_PUBLIC_URL
+            - name: BANK_PUBLIC_BASE_URL
               value: {{ required "realmImport.frontUiPublicUrl is required" .Values.realmImport.frontUiPublicUrl | quote }}
 
             {{- range .Values.realmImport.secretEnv }}

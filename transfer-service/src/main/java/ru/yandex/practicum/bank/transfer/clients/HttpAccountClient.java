@@ -2,13 +2,16 @@ package ru.yandex.practicum.bank.transfer.clients;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import ru.yandex.practicum.bank.shared.clients.SimpleCircuitBreaker;
+import ru.yandex.practicum.bank.shared.clients.ResilientExecutorClient;
+import ru.yandex.practicum.bank.shared.clients.ResilientFactoryClient;
 import ru.yandex.practicum.bank.shared.viewmodels.ApiErrorResponseViewModel;
 import ru.yandex.practicum.bank.transfer.exceptions.AccountClientException;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferExecutor;
@@ -30,9 +33,11 @@ public class HttpAccountClient implements TransferExecutor {
 
     private final RestClient restClient;
     private final ServiceTokenProvider serviceTokenProvider;
-    private final SimpleCircuitBreaker circuitBreaker;
-    private final ObjectMapper objectMapper;
+    private final ResilientExecutorClient executorClient;
     private final AccountTransferMapper  accountTransferMapper;
+    private final ObjectMapper objectMapper;
+
+    private static final Logger log = LoggerFactory.getLogger(HttpAccountClient.class);
 
     // endregion
 
@@ -43,16 +48,17 @@ public class HttpAccountClient implements TransferExecutor {
             RestClient.Builder restClientBuilder,
             @Value("${bank.services.account-service.base-url}") String accountBaseUrl,
             ServiceTokenProvider serviceTokenProvider,
-            ObjectMapper objectMapper,
-            AccountTransferMapper accountTransferMapper
+            ResilientFactoryClient resilientFactoryClient,
+            AccountTransferMapper accountTransferMapper,
+            ObjectMapper objectMapper
     ) {
         this(
                 restClientBuilder,
                 accountBaseUrl,
                 serviceTokenProvider,
-                SimpleCircuitBreaker.withDefaults("accountService"),
-                objectMapper,
-                accountTransferMapper
+                resilientFactoryClient.create("accountService", HttpAccountClient::isRecoverable),
+                accountTransferMapper,
+                objectMapper
         );
     }
 
@@ -60,14 +66,31 @@ public class HttpAccountClient implements TransferExecutor {
             RestClient.Builder restClientBuilder,
             String accountBaseUrl,
             ServiceTokenProvider serviceTokenProvider,
-            SimpleCircuitBreaker circuitBreaker,
-            ObjectMapper objectMapper,
-            AccountTransferMapper accountTransferMapper
+            AccountTransferMapper accountTransferMapper,
+            ObjectMapper objectMapper
+    ) {
+        this(
+                restClientBuilder,
+                accountBaseUrl,
+                serviceTokenProvider,
+                ResilientFactoryClient.withDefaults(),
+                accountTransferMapper,
+                objectMapper
+        );
+    }
+
+    HttpAccountClient(
+            RestClient.Builder restClientBuilder,
+            String accountBaseUrl,
+            ServiceTokenProvider serviceTokenProvider,
+            ResilientExecutorClient executorClient,
+            AccountTransferMapper accountTransferMapper,
+            ObjectMapper objectMapper
     ) {
         this.serviceTokenProvider = serviceTokenProvider;
-        this.circuitBreaker = circuitBreaker;
-        this.objectMapper = objectMapper;
+        this.executorClient = executorClient;
         this.accountTransferMapper = accountTransferMapper;
+        this.objectMapper = objectMapper;
         this.restClient = restClientBuilder
                 .baseUrl(accountBaseUrl)
                 .build();
@@ -88,7 +111,7 @@ public class HttpAccountClient implements TransferExecutor {
      **/
     @Override
     public TransferResultViewModel execute(TransferOperationViewModel operation) {
-        return circuitBreaker.execute(
+        return executorClient.execute(
                 () -> executeWithoutCircuitBreaker(operation),
                 this::accountsFallback
         );
@@ -106,14 +129,20 @@ public class HttpAccountClient implements TransferExecutor {
      **/
     private TransferResultViewModel executeWithoutCircuitBreaker(TransferOperationViewModel operation) {
         try {
+            if (log.isDebugEnabled()) {
+                log.debug(
+                        "Account downstream request prepared operationId={} operationType=TRANSFER currency={} source=transfer-service targetService=account-service",
+                        operation.operationId(),
+                        operation.currency()
+                );
+            }
+
             var response = restClient.post()
                     .uri("/api/account/internal/balance/transfer")
                     .headers(headers -> headers.setBearerAuth(serviceTokenProvider.getAccessToken()))
                     .body(accountTransferMapper.toAccountRequest(operation))
                     .retrieve()
                     .body(AccountTransferResponseViewModel.class);
-
-            assert response != null;
 
             return new TransferResultViewModel(
                     response.senderLogin(),
@@ -122,10 +151,32 @@ public class HttpAccountClient implements TransferExecutor {
                     response.currency()
             );
         } catch (RestClientResponseException exception) {
-            throw new AccountClientException(extractMessage(exception), exception);
+            var error = extractError(exception);
+
+            throw new AccountClientException(
+                    error.message(),
+                    exception.getStatusCode(),
+                    error.code(),
+                    exception
+            );
         } catch (RestClientException exception) {
-            throw new AccountClientException("Запрос на обслуживание учетной записи не удался.", exception);
+            log.error(
+                    "Account downstream request failed operationId={} operationType=TRANSFER currency={} status=error errorCategory=downstream_unavailable errorType={} source=transfer-service targetService=account-service",
+                    operation.operationId(),
+                    operation.currency(),
+                    exception.getClass().getSimpleName()
+            );
+
+            throw new AccountClientException("Account service request failed", exception);
         }
+    }
+
+    private static boolean isRecoverable(Throwable exception) {
+        if (exception instanceof AccountClientException accountClientException) {
+            return accountClientException.getStatusCode().is5xxServerError();
+        }
+
+        return true;
     }
 
     /**
@@ -139,9 +190,23 @@ public class HttpAccountClient implements TransferExecutor {
      * @throws AccountClientException Перевыбрасывает исходное исключение или создаёт новое сообщение о недоступности.
      **/
     private TransferResultViewModel accountsFallback(Throwable exception) {
-        if (exception instanceof AccountClientException accountsClientException) {
-            throw accountsClientException;
+        if (exception instanceof AccountClientException accountClientException) {
+            if (accountClientException.getStatusCode().is5xxServerError()) {
+                log.error(
+                        "Account downstream retries exhausted status={} errorCode={} errorCategory=downstream_unavailable errorType={} source=transfer-service targetService=account-service",
+                        accountClientException.getStatusCode().value(),
+                        accountClientException.getCode(),
+                        accountClientException.getClass().getSimpleName()
+                );
+            }
+
+            throw accountClientException;
         }
+
+        log.error(
+                "Account downstream retries exhausted status=error errorCategory=downstream_unavailable errorType={} source=transfer-service targetService=account-service",
+                exception.getClass().getSimpleName()
+        );
 
         throw new AccountClientException("Сервис счетов временно недоступен", exception);
     }
@@ -155,21 +220,22 @@ public class HttpAccountClient implements TransferExecutor {
      * @return Текст ошибки из структуры ApiErrorResponseViewModel или дефолтное сообщение.
      * </return>
      **/
-    private String extractMessage(RestClientResponseException exception) {
+    private ApiErrorResponseViewModel extractError(RestClientResponseException exception) {
         try {
             var error = objectMapper.readValue(exception.getResponseBodyAsString(), ApiErrorResponseViewModel.class);
 
-            if (error.message() != null && !error.message().isBlank()) {
-                return error.message();
+            if (isNotBlank(error.code()) && isNotBlank(error.message())) {
+
+                return error;
             }
         } catch (JsonProcessingException ignored) {
-            /*
-             * Используйте стабильный резервный вариант,
-             * если нижестоящий поставщик не возвращает ожидаемое тело ошибки.
-             */
-        }
 
-        return "Запрос на обслуживание учетной записи не удался.";
+        }
+        return new ApiErrorResponseViewModel("ACCOUNT_SERVICE_ERROR", "Account service request failed");
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.isBlank();
     }
 
     // endregion

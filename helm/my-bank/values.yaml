@@ -12,10 +12,23 @@ global:
     username: postgres
   env:
     SPRING_JACKSON_DEFAULTPROPERTYINCLUSION: non_null
+
     BANK_PUBLIC_BASE_URL: http://localhost:8080
+
     BANK_KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/my-bank-realm
     BANK_KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/certs
     BANK_KEYCLOAK_TOKEN_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/token
+
+    BANK_KAFKA_NOTIFICATION_DLT_PARTITIONS: "3"
+    BANK_KAFKA_NOTIFICATION_DLT_RETENTION_MS: "604800000"
+    BANK_KAFKA_NOTIFICATION_DLT_TOPIC: bank.notification.dlt
+    BANK_KAFKA_NOTIFICATION_PARTITIONS: "3"
+    BANK_KAFKA_NOTIFICATION_REPLICATION_FACTOR: "1"
+    BANK_KAFKA_NOTIFICATION_TOPIC: bank.notification
+
+helmTest:
+  enabled: true
+  kubectlImage: registry.k8s.io/kubectl:v1.35.5
 
 gatewayApi:
   enabled: true
@@ -24,6 +37,13 @@ gatewayApi:
     name: http
     port: 80
     hostname: ""
+
+kafka:
+  enabled: true
+  fullnameOverride: kafka
+  persistence:
+    size: 2Gi
+    storageClass: ""
 
 keycloak:
   enabled: true

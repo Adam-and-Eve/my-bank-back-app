@@ -4,11 +4,14 @@ import jakarta.validation.Valid;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.bank.transfer.exceptions.MissingPreferredUsernameException;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferService;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferRequestViewModel;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
+
+import java.util.UUID;
 
 /**
  * <summary>
@@ -17,6 +20,8 @@ import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
  **/
 @RestController
 public class TransferController {
+
+    private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
 
     private final TransferService transferService;
 
@@ -37,9 +42,10 @@ public class TransferController {
     @PostMapping("/api/transfer")
     public TransferResponseViewModel transfer(
             JwtAuthenticationToken authentication,
+            @RequestHeader(IDEMPOTENCY_KEY_HEADER) UUID idempotencyKey,
             @Valid @RequestBody TransferRequestViewModel request
     ) {
-        return transferService.transfer(getLogin(authentication), request);
+        return transferService.transfer(getLogin(authentication), request, idempotencyKey);
     }
 
     /**

@@ -1,20 +1,25 @@
 package ru.yandex.practicum.bank.notification.services;
 
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
-import ru.yandex.practicum.bank.notification.viewmodels.NotificationRequestViewModel;
+import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
+import ru.yandex.practicum.bank.shared.models.NotificationSourceEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationTypeEnumModel;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 /**
  * <summary>
- * Модульные тесты для сервиса NotificationServiceImpl.
- * Проверяет выполнение бизнес-логики приёма уведомлений и корректность логирования входящих данных.
+ * Модульные тесты для реализации сервиса уведомлений NotificationServiceImpl.
+ * Проверяют корректную работу логирования входящих событий.
  * </summary>
  **/
 @ExtendWith(OutputCaptureExtension.class)
@@ -28,11 +33,6 @@ public class NotificationServiceImplTest {
 
     // region Setup
 
-    /**
-     * <summary>
-     * Выполняет инициализацию тестируемого сервиса перед каждым тестовым сценарием.
-     * </summary>
-     **/
     @BeforeEach
     public void setUp() {
         notificationService = new NotificationServiceImpl();
@@ -44,24 +44,36 @@ public class NotificationServiceImplTest {
 
     /**
      * <summary>
-     * Проверяет, что метод notify корректно принимает объект запроса и фиксирует все его параметры в логах.
+     * Проверяет, что при передаче события уведомления сервис успешно формирует
+     * и записывает в лог (INFO) строку с ключевыми метаданными:
+     * eventId, operationId, source и type.
      * </summary>
-     * @param output Перехваченный вывод системы логирования для проверки содержащихся сообщений.
      **/
     @Test
-    @DisplayName("Должен успешно логировать детали принятого уведомления")
     public void shouldLogNotificationDetails(CapturedOutput output) {
-        var request = new NotificationRequestViewModel(
+        var eventId = UUID.randomUUID();
+
+        var operationId = UUID.randomUUID();
+
+        var event = new NotificationEventModel(
+                eventId,
+                operationId,
+                NotificationSourceEnumModel.TRANSFER,
+                NotificationTypeEnumModel.TRANSFER_INCOMING,
                 "dmitry",
-                "CASH_DEPOSIT",
-                "Счёт пополнен на 250.00 RUB",
-                "operation-1"
+                "Получен перевод",
+                Instant.now(),
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.RUB
         );
 
-        assertDoesNotThrow(() -> notificationService.notify(request));
+        notificationService.notify(event);
 
         assertThat(output.getOut())
-                .contains("Notification accepted: recipientLogin=dmitry, type=CASH_DEPOSIT, operationId=operation-1, message=Счёт пополнен на 250.00 RUB");
+                .contains("Notification accepted: eventId=" + eventId)
+                .contains("operationId=" + operationId)
+                .contains("source=TRANSFER")
+                .contains("type=TRANSFER_INCOMING");
     }
 
     // endregion

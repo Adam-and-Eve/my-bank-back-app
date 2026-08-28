@@ -114,6 +114,7 @@ public class ExchangeServiceImpl implements ExchangeService {
             ExchangeRatesUpdateRequestViewModel request) {
 
         var updatedAt = clock.instant();
+
         var updatedRates = new EnumMap<>(rates);
 
         for (ExchangeRateUpdateRequestViewModel rate : request.rates()) {
@@ -131,6 +132,7 @@ public class ExchangeServiceImpl implements ExchangeService {
             }
 
             ExchangeHelper.validateRate(rate.buyRate());
+
             ExchangeHelper.validateRate(rate.sellRate());
 
             updatedRates.put(
@@ -178,6 +180,7 @@ public class ExchangeServiceImpl implements ExchangeService {
         var currentRates = rates;
 
         var sourceRate = currentRates.get(sourceCurrency);
+
         var targetRate = currentRates.get(targetCurrency);
 
         var conversionRate = sourceRate.sellRate()

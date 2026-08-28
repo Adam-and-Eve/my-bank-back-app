@@ -1,10 +1,11 @@
 package ru.yandex.practicum.bank.notification.interfaces;
 
-import ru.yandex.practicum.bank.notification.viewmodels.NotificationRequestViewModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
 /**
  * <summary>
  * Контракт сервиса управления и отправки уведомлений.
+ * Определяет основную бизнес-логику обработки входящих событий нотификации.
  * </summary>
  **/
 public interface NotificationService {
@@ -13,11 +14,11 @@ public interface NotificationService {
 
     /**
      * <summary>
-     * Принимает запрос на отправку уведомления и фиксирует его в логах системы.
+     * Принимает запрос (событие) на отправку уведомления и фиксирует его в логах системы.
      * </summary>
-     * @param request Модель данных с параметрами отправляемого уведомления.
+     * @param event Модель события уведомления, содержащая информацию об операции, получателе и тексте сообщения.
      **/
-    public void notify(NotificationRequestViewModel request);
+    void notify(NotificationEventModel event);
 
     // endregion
 }

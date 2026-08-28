@@ -8,24 +8,52 @@ package ru.yandex.practicum.bank.frontui.exceptions;
  **/
 public class GatewayClientException extends RuntimeException {
 
+    // region Fields
+
+    private final boolean technical;
+
+    // endregion
+
+    // region Constructors
+
     /**
      * <summary>
-     * Создает новое исключение с детальным сообщением об ошибке.
+     * Инициализирует исключение бизнес-ошибки шлюза с заданным сообщением.
+     * Флаг технической ошибки устанавливается в false.
      * </summary>
-     * @param message Сообщение, описывающее причину возникновения ошибки.
+     * @param message Текст сообщения об ошибке.
      **/
     public GatewayClientException(String message) {
         super(message);
+        this.technical = false;
     }
 
     /**
      * <summary>
-     * Создает новое исключение с детальным сообщением и первопричиной (cause).
+     * Инициализирует исключение технической ошибки шлюза с заданным сообщением и исходной причиной.
+     * Флаг технической ошибки устанавливается в true.
      * </summary>
-     * @param message Сообщение, описывающее причину возникновения ошибки.
-     * @param cause Первопричина исключения.
+     * @param message Текст сообщения об ошибке.
+     * @param cause Первопричина исключения (Throwable).
      **/
     public GatewayClientException(String message, Throwable cause) {
         super(message, cause);
+        this.technical = true;
     }
+
+    // endregion
+
+    // region Public Methods
+
+    /**
+     * <summary>
+     * Возвращает признак технической ошибки (true, если сбой сетевой/инфраструктурный, иначе false).
+     * </summary>
+     * @return Логическое значение признака технического сбоя.
+     **/
+    public boolean isTechnical() {
+        return technical;
+    }
+
+    // endregion
 }

@@ -10,6 +10,7 @@ Contract.make {
         headers {
             contentType applicationJson()
             header "Authorization", "Bearer token"
+            header "Idempotency-Key", "99999999-9999-9999-9999-999999999999"
         }
         body(
                 recipientLogin: "dmitry",
@@ -23,8 +24,8 @@ Contract.make {
             contentType applicationJson()
         }
         body(
-                senderLogin: "dmitry",
-                recipientLogin: "alexey",
+                senderLogin: "alexey",
+                recipientLogin: "dmitry",
                 senderBalance: "850.00",
                 currency: "RUB",
                 message: "Transfer completed"

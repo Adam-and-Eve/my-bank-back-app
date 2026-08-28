@@ -91,7 +91,7 @@ public class CashSecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет отклонение запроса (403 Forbidden), если у пользователя отсутствует роль ROLE_CASH_WRITE.
+     * Проверяет отклонение запроса (403 Forbidden), если у пользователя отсутствует роль CASH_WRITE.
      * </summary>
      **/
     @Test
@@ -109,7 +109,7 @@ public class CashSecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет отклонение запроса (403 Forbidden), если у пользователя отсутствует роль ROLE_USER.
+     * Проверяет отклонение запроса (403 Forbidden), если у пользователя отсутствует роль USER.
      * </summary>
      **/
     @Test
@@ -127,18 +127,24 @@ public class CashSecurityConfigurationTest {
 
     /**
      * <summary>
-     * Проверяет успешную обработку пополнения (200 OK) при наличии ролей ROLE_USER и ROLE_CASH_WRITE.
+     * Проверяет успешную обработку пополнения (200 OK) при наличии ролей USER и CASH_WRITE.
+     * </summary>
+     **/
+    /**
+     * <summary>
+     * Проверяет успешную обработку пополнения (200 OK) при наличии ролей USER и CASH_WRITE.
      * </summary>
      **/
     @Test
     public void shouldAllowDepositWithRequiredRoles() throws Exception {
-        when(cashService.deposit(any(), any())).thenReturn(new CashOperationResponseViewModel(
+        when(cashService.deposit(any(), any(), any())).thenReturn(new CashOperationResponseViewModel(
                 new BigDecimal("1500.00"),
                 "RUB",
                 "Счёт пополнен"
         ));
 
         mockMvc.perform(post(DEPOSIT_URL)
+                        .header("Idempotency-Key", java.util.UUID.randomUUID().toString())
                         .with(jwt()
                                 .jwt(token -> token.claim("preferred_username", "alexey"))
                                 .authorities(

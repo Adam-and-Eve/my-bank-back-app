@@ -1,5 +1,8 @@
 package ru.yandex.practicum.bank.transfer.exceptions;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
+
 /**
  * <summary>
  * Исключение, возникающее при ошибках взаимодействия с клиентом сервиса счетов (Accounts Service).
@@ -7,24 +10,40 @@ package ru.yandex.practicum.bank.transfer.exceptions;
  **/
 public class AccountClientException extends RuntimeException {
 
-    /**
-     * <summary>
-     * Создает новый экземпляр исключения с указанным понятным сообщением об ошибке.
-     * </summary>
-     * @param message Сообщение с подробным описанием причины сбоя.
-     **/
+    private final HttpStatusCode statusCode;
+    private final String code;
+
     public AccountClientException(String message) {
-        super(message);
+        this(message, HttpStatus.BAD_GATEWAY, "ACCOUNT_SERVICE_UNAVAILABLE", null);
     }
 
-    /**
-     * <summary>
-     * Создает новый экземпляр исключения с указанным сообщением и исходной причиной ошибки.
-     * </summary>
-     * @param message Сообщение с подробным описанием причины сбоя.
-     * @param cause Исходное исключение (причина сбоя).
-     **/
     public AccountClientException(String message, Throwable cause) {
+        this(message, HttpStatus.BAD_GATEWAY, "ACCOUNT_SERVICE_UNAVAILABLE", cause);
+    }
+
+    public AccountClientException(String message, HttpStatusCode statusCode, Throwable cause) {
+        this(message, statusCode, defaultCode(statusCode), cause);
+    }
+
+    public AccountClientException(String message, HttpStatusCode statusCode, String code, Throwable cause) {
         super(message, cause);
+        this.statusCode = statusCode;
+        this.code = code;
+    }
+
+    public HttpStatusCode getStatusCode() {
+        return statusCode;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    private static String defaultCode(HttpStatusCode statusCode) {
+        if (statusCode.value() == HttpStatus.CONFLICT.value()) {
+            return "IDEMPOTENCY_CONFLICT";
+        }
+
+        return "ACCOUNT_SERVICE_UNAVAILABLE";
     }
 }

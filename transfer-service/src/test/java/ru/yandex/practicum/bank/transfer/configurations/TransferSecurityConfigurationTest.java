@@ -14,6 +14,7 @@ import ru.yandex.practicum.bank.transfer.interfaces.TransferService;
 import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -68,11 +69,12 @@ public class TransferSecurityConfigurationTest {
     @Test
     public void shouldRejectTransferEndpointWithoutJwt() throws Exception {
         mockMvc.perform(post("/api/transfer")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(transferRequest()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                .andExpect(jsonPath("$.message").value("Требуется авторизация"));
+                .andExpect(jsonPath("$.message").value("Authorization is required"));
     }
 
     /**
@@ -83,6 +85,7 @@ public class TransferSecurityConfigurationTest {
     @Test
     public void shouldRejectTransferEndpointWithoutWriteRole() throws Exception {
         mockMvc.perform(post("/api/transfer")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .with(jwt()
                                 .jwt(token -> token.claim("preferred_username", "dmitry"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_USER")))
@@ -90,7 +93,7 @@ public class TransferSecurityConfigurationTest {
                         .content(transferRequest()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-                .andExpect(jsonPath("$.message").value("Недостаточно прав для выполнения операции"));
+                .andExpect(jsonPath("$.message").value("Not enough permissions"));
     }
 
     /**
@@ -100,7 +103,7 @@ public class TransferSecurityConfigurationTest {
      **/
     @Test
     public void shouldAllowTransferWithRequiredRoles() throws Exception {
-        when(transferService.transfer(any(), any())).thenReturn(new TransferResponseViewModel(
+        when(transferService.transfer(any(), any(), any())).thenReturn(new TransferResponseViewModel(
                 "dmitry",
                 "alexey",
                 new BigDecimal("800.00"),
@@ -109,6 +112,7 @@ public class TransferSecurityConfigurationTest {
         ));
 
         mockMvc.perform(post("/api/transfer")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .with(jwt()
                                 .jwt(token -> token.claim("preferred_username", "dmitry"))
                                 .authorities(
@@ -128,10 +132,11 @@ public class TransferSecurityConfigurationTest {
      **/
     @Test
     public void shouldRejectTransferEndpointWhenPreferredUsernameIsMissing() throws Exception {
-        when(transferService.transfer(any(), any()))
+        when(transferService.transfer(any(), any(), any()))
                 .thenThrow(new MissingPreferredUsernameException());
 
         mockMvc.perform(post("/api/transfer")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
                         .with(jwt()
                                 .jwt(token -> token.claim("email", "dmitry@example.com"))
                                 .authorities(
@@ -152,9 +157,7 @@ public class TransferSecurityConfigurationTest {
      * <summary>
      * Вспомогательный метод формирования валидного JSON-тела запроса перевода.
      * </summary>
-     * <return>
      * @return JSON-строка запроса TransferRequestViewModel.
-     * </return>
      **/
     private String transferRequest() {
         return """

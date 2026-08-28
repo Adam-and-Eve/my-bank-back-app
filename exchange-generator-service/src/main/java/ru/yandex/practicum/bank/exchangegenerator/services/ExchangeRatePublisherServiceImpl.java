@@ -2,9 +2,9 @@ package ru.yandex.practicum.bank.exchangegenerator.services;
 
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import ru.yandex.practicum.bank.exchangegenerator.interfaces.InternalExchangeClient;
 import ru.yandex.practicum.bank.exchangegenerator.interfaces.ExchangeRateGeneratorService;
 import ru.yandex.practicum.bank.exchangegenerator.interfaces.ExchangeRatePublisherService;
+import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
 
 /**
  * <summary>
@@ -18,7 +18,7 @@ public class ExchangeRatePublisherServiceImpl implements ExchangeRatePublisherSe
 
     private final ExchangeRateGeneratorService exchangeRateGenerator;
 
-    private final InternalExchangeClient internalExchangeClient;
+    private final ExchangeClient exchangeClient;
 
     // endregion
 
@@ -26,10 +26,10 @@ public class ExchangeRatePublisherServiceImpl implements ExchangeRatePublisherSe
 
     public ExchangeRatePublisherServiceImpl(
             ExchangeRateGeneratorService exchangeRateGenerator,
-            InternalExchangeClient internalExchangeClient
+            ExchangeClient exchangeClient
     ) {
         this.exchangeRateGenerator = exchangeRateGenerator;
-        this.internalExchangeClient = internalExchangeClient;
+        this.exchangeClient = exchangeClient;
     }
 
     // endregion
@@ -45,7 +45,7 @@ public class ExchangeRatePublisherServiceImpl implements ExchangeRatePublisherSe
     @Override
     @Scheduled(fixedDelayString = "${bank.services.exchange-generator-service.fixed-delay-ms:1000}")
     public void publishNextRates() {
-        internalExchangeClient.updateRates(exchangeRateGenerator.nextRates());
+        exchangeClient.updateRates(exchangeRateGenerator.nextRates());
     }
 
     // endregion

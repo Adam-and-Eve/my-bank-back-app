@@ -1,3 +1,31 @@
 global:
   namespace: prod
   imageTag: stable
+  publicBaseUrl: http://localhost:8080
+  keycloakPublicUrl: http://localhost:8080/realms/my-bank-realm
+  env:
+    BANK_KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/my-bank-realm
+
+gatewayApi:
+  listener:
+    hostname: localhost
+
+kafka:
+  clusterId: Hz5JRp00D1iXfKZoXfO-k
+
+front-ui-service:
+  env:
+    BANK_PUBLIC_BASE_URL: http://localhost:8080
+    BANK_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/auth
+    BANK_KEYCLOAK_END_SESSION_URI: http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/logout
+    BANK_KEYCLOAK_REDIRECT_URI: http://localhost:8080/login/oauth2/code/{registrationId}
+
+keycloak:
+  extraEnv:
+    - name: KC_HOSTNAME
+      value: http://localhost:8080
+
+    - name: KC_HOSTNAME_STRICT
+      value: "false"
+  realmImport:
+    frontUiPublicUrl: http://localhost:8080

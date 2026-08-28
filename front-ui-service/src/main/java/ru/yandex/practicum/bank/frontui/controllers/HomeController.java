@@ -1,6 +1,8 @@
 package ru.yandex.practicum.bank.frontui.controllers;
 
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -38,6 +40,8 @@ public class HomeController {
 
     private final HomeModelFactoryHelper modelFactory;
 
+    private static final Logger log = LoggerFactory.getLogger(HomeController.class);
+
     // endregion
 
     // region Constructors
@@ -69,6 +73,8 @@ public class HomeController {
             Authentication authentication) {
         modelFactory.populateMainPageModel(model, principal, authentication);
 
+        log.info("Home page loaded status=success source=front-ui-service");
+
         return "index";
     }
 
@@ -91,6 +97,8 @@ public class HomeController {
             RedirectAttributes redirectAttributes
     ) {
         if (bindingResult.hasErrors()) {
+            log.warn("Front user action rejected operationType=UPDATE_PROFILE status=validation_failed errorCode=FORM_VALIDATION_ERROR source=front-ui-service");
+
             modelFactory.populateMainPageModel(model, principal, authentication);
 
             model.addAttribute("errorMessage", "Заполните имя и дату рождения");
@@ -99,12 +107,20 @@ public class HomeController {
         }
 
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Front downstream action prepared operationType=UPDATE_PROFILE source=front-ui-service targetService=api-gateway");
+            }
+
             var accessToken = securityUserContext.getAccessToken(authentication);
 
             gatewayClient.updateAccount(accessToken, accountForm);
 
+            log.info("Front user action completed operationType=UPDATE_PROFILE status=success source=front-ui-service targetService=api-gateway");
+
             redirectAttributes.addFlashAttribute("successMessage", "Данные аккаунта сохранены");
         } catch (GatewayClientException exception) {
+            modelFactory.logGatewayClientFailure("UPDATE_PROFILE", exception);
+
             redirectAttributes.addFlashAttribute("errorMessage", exception.getMessage());
         }
 
@@ -130,6 +146,8 @@ public class HomeController {
             RedirectAttributes redirectAttributes
     ) {
         if (bindingResult.hasErrors()) {
+            log.warn("Front user action rejected operationType=CASH status=validation_failed errorCode=FORM_VALIDATION_ERROR source=front-ui-service");
+
             modelFactory.populateMainPageModel(model, principal, authentication);
 
             model.addAttribute("errorMessage", "Заполните положительную сумму");
@@ -138,16 +156,34 @@ public class HomeController {
         }
 
         try {
+            if (log.isDebugEnabled()) {
+                log.debug(
+                        "Front downstream action prepared operationType={} source=front-ui-service targetService=api-gateway",
+                        modelFactory.cashActionType(action)
+                );
+            }
+
             var accessToken = securityUserContext.getAccessToken(authentication);
 
             var response = switch (action) {
                 case "deposit" -> gatewayClient.deposit(accessToken, cashForm);
                 case "withdraw" -> gatewayClient.withdraw(accessToken, cashForm);
-                default -> throw new GatewayClientException("Unknown cash action: " + action);
+                default -> {
+                    log.warn("Front user action rejected operationType=CASH status=validation_failed errorCode=UNKNOWN_CASH_ACTION source=front-ui-service");
+
+                    throw new GatewayClientException("Unknown cash action: " + action);
+                }
             };
+
+            log.info(
+                    "Front user action completed operationType={} status=success source=front-ui-service targetService=api-gateway",
+                    modelFactory.cashActionType(action)
+            );
 
             redirectAttributes.addFlashAttribute("successMessage", response.message());
         } catch (GatewayClientException exception) {
+            modelFactory.logGatewayClientFailure(modelFactory.cashActionType(action), exception);
+
             redirectAttributes.addFlashAttribute("errorMessage", exception.getMessage());
 
             redirectAttributes.addFlashAttribute("cashForm", cashForm);
@@ -174,6 +210,8 @@ public class HomeController {
             RedirectAttributes redirectAttributes
     ) {
         if (bindingResult.hasErrors()) {
+            log.warn("Front user action rejected operationType=TRANSFER status=validation_failed errorCode=FORM_VALIDATION_ERROR source=front-ui-service");
+
             modelFactory.populateMainPageModel(model, principal, authentication);
 
             model.addAttribute("errorMessage", "Заполните получателя, сумму и валюту");
@@ -182,14 +220,22 @@ public class HomeController {
         }
 
         try {
+            if (log.isDebugEnabled()) {
+                log.debug("Front downstream action prepared operationType=TRANSFER source=front-ui-service targetService=api-gateway");
+            }
+
             var accessToken = securityUserContext.getAccessToken(authentication);
 
             var response = gatewayClient.transfer(accessToken, transferForm);
+
+            log.info("Front user action completed operationType=TRANSFER status=success source=front-ui-service targetService=api-gateway");
 
             redirectAttributes.addFlashAttribute("successMessage", "Перевод выполнен");
 
             redirectAttributes.addFlashAttribute("transferResponse", response);
         } catch (GatewayClientException exception) {
+            modelFactory.logGatewayClientFailure("TRANSFER", exception);
+
             redirectAttributes.addFlashAttribute("errorMessage", exception.getMessage());
 
             redirectAttributes.addFlashAttribute("transferForm", transferForm);

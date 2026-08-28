@@ -118,52 +118,52 @@ def helmDeploy(
     }
 }
 
+def runHelmTest(String namespace, String testName, String stageName) {
+    stage(stageName) {
+        try {
+            runCommand(
+                    "helm test my-bank " +
+                            "--namespace ${namespace} " +
+                            "--filter name=${testName} " +
+                            "--timeout 30m"
+            )
+        } catch (Exception e) {
+            echo "${stageName} failed. Collecting diagnostics for ${testName}..."
 
-def helmSmokeTest(String namespace) {
+            runCommand(
+                    "kubectl get job ${testName} " +
+                            "--namespace ${namespace} || true"
+            )
 
+            runCommand(
+                    "kubectl get pods " +
+                            "--namespace ${namespace} " +
+                            "-l job-name=${testName} || true"
+            )
+
+            runCommand(
+                    "kubectl logs " +
+                            "--namespace ${namespace} " +
+                            "-l job-name=${testName} " +
+                            "--tail=-1 " +
+                            "--all-containers=true || true"
+            )
+
+            throw e
+        }
+    }
+}
+
+def executeAllHelmTests(String namespace) {
     withCredentials([
             file(
                     credentialsId: 'my-bank-kubeconfig',
                     variable: 'KUBECONFIG'
             )
     ]) {
-
-        stage('Helm smoke test') {
-
-            try {
-
-                runCommand(
-                        "helm test my-bank " +
-                                "--namespace ${namespace} " +
-                                "--timeout 30m"
-                )
-
-            } catch (Exception e) {
-
-                echo 'Helm smoke test failed. Collecting diagnostics...'
-
-                runCommand(
-                        "kubectl get job my-bank-smoke-test " +
-                                "--namespace ${namespace}"
-                )
-
-                runCommand(
-                        "kubectl get pods " +
-                                "--namespace ${namespace} " +
-                                "-l job-name=my-bank-smoke-test"
-                )
-
-                runCommand(
-                        "kubectl logs " +
-                                "--namespace ${namespace} " +
-                                "-l job-name=my-bank-smoke-test " +
-                                "--tail=-1 " +
-                                "--all-containers=true"
-                )
-
-                throw e
-            }
-        }
+        runHelmTest(namespace, 'my-bank-smoke-test', 'Smoke Tests')
+        runHelmTest(namespace, 'my-bank-kafka-broker-test', 'Kafka Broker Tests')
+        runHelmTest(namespace, 'my-bank-kafka-persistence-test', 'Kafka Persistence Tests')
     }
 }
 
@@ -412,8 +412,7 @@ def runUmbrellaPipeline() {
                         imageTag
                 )
 
-
-                helmSmokeTest('test')
+                executeAllHelmTests('test')
             }
         }
 
@@ -476,6 +475,5 @@ def runUmbrellaPipeline() {
         }
     }
 }
-
 
 return this
