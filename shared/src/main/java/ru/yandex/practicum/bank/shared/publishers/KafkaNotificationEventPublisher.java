@@ -4,6 +4,11 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.apache.kafka.common.errors.AuthenticationException;
+import org.apache.kafka.common.errors.AuthorizationException;
+import org.apache.kafka.common.errors.SerializationException;
+import org.apache.kafka.common.errors.TimeoutException;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
@@ -123,17 +128,17 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
     private String errorCategory(Throwable exception) {
         var cause = rootCause(exception);
 
-        var type = cause.getClass().getSimpleName().toLowerCase(Locale.ROOT);
-
-        if (type.contains("timeout")) {
+        if (cause instanceof TimeoutException) {
             return "timeout";
         }
 
-        if (type.contains("serializ")) {
+        if (cause instanceof SerializationException ||
+                cause instanceof JsonProcessingException) {
             return "serialization";
         }
 
-        if (type.contains("authoriz") || type.contains("authenticat")) {
+        if (cause instanceof AuthenticationException ||
+                cause instanceof AuthorizationException) {
             return "security";
         }
 
