@@ -145,21 +145,21 @@ describe("observability Helm render", () => {
     test("renders application ServiceMonitors and five bank alerts", () => {
         for (const application of applications) {
             const serviceMonitor = namedResource("ServiceMonitor", application);
-            expect(serviceMonitor).toContain("my-bank/management-service: \"true\"");
+            expect(serviceMonitor).toContain("bank/management-service: \"true\"");
             expect(serviceMonitor).toContain("port: management");
             expect(serviceMonitor).toContain("path: /actuator/prometheus");
 
             const managementService = namedResource("Service", `${application}-management`);
-            expect(managementService).toContain("my-bank/management-service: \"true\"");
+            expect(managementService).toContain("bank/management-service: \"true\"");
             expect(managementService).toContain("name: management");
 
             const applicationService = optionalNamedResource("Service", application);
             if (applicationService) {
-                expect(applicationService).not.toContain("my-bank/management-service: \"true\"");
+                expect(applicationService).not.toContain("bank/management-service: \"true\"");
             }
         }
         const rule = namedResource("PrometheusRule", "my-bank-alerts");
-        expect((rule.match(/- alert: MyBank/g) ?? []).length).toBe(5);
+        expect((rule.match(/- alert: Bank/g) ?? []).length).toBe(5);
         expect(rule).toContain("clamp_min");
     });
 
@@ -198,7 +198,7 @@ describe("observability Helm render", () => {
             const observabilityJob = observabilityTestJob(renderedManifest);
             const elasticStackChecks = [
                 'check_url "Elasticsearch health" "http://elasticsearch:9200/_cluster/health"',
-                'check_url "Logstash API" "http://logstash:9600/_node/pipelines/my-bank-logs"',
+                'check_url "Logstash API" "http://logstash:9600/_node/pipelines/bank-logs"',
                 "telnet://logstash:5000",
                 'check_url "Kibana status" "http://kibana:5601/api/status"',
             ];
