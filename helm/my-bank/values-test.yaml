@@ -46,6 +46,11 @@ monitoring:
   kube-state-metrics:
     rbac:
       useClusterRole: false
+    sidecar:
+      dashboards:
+        searchNamespace: test
+      datasources:
+        searchNamespace: test
   prometheusOperator:
     admissionWebhooks:
       enabled: false

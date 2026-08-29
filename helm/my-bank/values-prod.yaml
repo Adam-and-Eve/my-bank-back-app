@@ -44,6 +44,11 @@ monitoring:
   grafana:
     rbac:
       namespaced: true
+    sidecar:
+      dashboards:
+        searchNamespace: test
+      datasources:
+        searchNamespace: test
   kube-state-metrics:
     rbac:
       useClusterRole: false
