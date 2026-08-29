@@ -37,6 +37,7 @@ spec:
               subPath: pipelines.yml
             - name: config
               mountPath: /usr/share/logstash/pipeline/my-bank.conf
+              subPath: my-bank.conf
           startupProbe:
             httpGet:
               path: /
