@@ -38,3 +38,6 @@ keycloak:
       value: "false"
   realmImport:
     frontUiPublicUrl: http://localhost:8080
+
+monitoring:
+  enabled: true

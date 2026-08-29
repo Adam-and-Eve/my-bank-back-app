@@ -14,13 +14,13 @@ kafka:
   clusterId: o5ir33Fm72lElPleLS-9o1
 
 elasticsearch:
-  enabled: true
+  enabled: false
 
 logstash:
-  enabled: true
+  enabled: false
 
 kibana:
-  enabled: true
+  enabled: false
 
 front-ui-service:
   env:
@@ -37,3 +37,6 @@ keycloak:
       value: "false"
   realmImport:
     frontUiPublicUrl: http://localhost:8080
+
+monitoring:
+  enabled: false
