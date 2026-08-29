@@ -51,7 +51,14 @@ def createKeycloakRealmSecret(String namespace) {
     }
 }
 
-def helmDeploy(List services, String namespace, String valuesFile, String secretsFile, String imageRegistry, String imageTag) {
+def helmDeploy(
+        List services,
+        String namespace,
+        String valuesFile,
+        String secretsFile,
+        String imageRegistry,
+        String imageTag
+) {
     withCredentials([
             file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')
     ]) {
@@ -73,9 +80,18 @@ def runHelmTest(String namespace, String testName, String stageName) {
             runCommand("helm test my-bank --namespace ${namespace} --filter name=${testName} --timeout 30m")
         } catch (Exception e) {
             echo "❌ Тест ${stageName} упал. Сбор логов для диагностики..."
-            runCommand("kubectl get job ${testName} --namespace ${namespace} || true", "kubectl get job ${testName} --namespace ${namespace} || exit 0")
-            runCommand("kubectl get pods --namespace ${namespace} -l job-name=${testName} || true", "kubectl get pods --namespace ${namespace} -l job-name=${testName} || exit 0")
-            runCommand("kubectl logs --namespace ${namespace} -l job-name=${testName} --tail=-1 --all-containers=true || true", "kubectl logs --namespace ${namespace} -l job-name=${testName} --tail=-1 --all-containers=true || exit 0")
+            runCommand(
+                    "kubectl get job ${testName} --namespace ${namespace} || true",
+                    "kubectl get job ${testName} --namespace ${namespace} || exit 0"
+            )
+            runCommand(
+                    "kubectl get pods --namespace ${namespace} -l job-name=${testName} || true",
+                    "kubectl get pods --namespace ${namespace} -l job-name=${testName} || exit 0"
+            )
+            runCommand(
+                    "kubectl logs --namespace ${namespace} -l job-name=${testName} --tail=-1 --all-containers=true || true",
+                    "kubectl logs --namespace ${namespace} -l job-name=${testName} --tail=-1 --all-containers=true || exit 0"
+            )
             throw e
         }
     }
@@ -107,12 +123,36 @@ def runUmbrellaPipeline() {
 
     properties([
             parameters([
-                    string(name: 'IMAGE_REGISTRY', defaultValue: 'registry.example.com/my-bank', description: 'Container registry namespace'),
-                    string(name: 'IMAGE_TAG', defaultValue: '', description: 'Image tag. Empty value uses Jenkins BUILD_NUMBER.'),
-                    booleanParam(name: 'BUILD_IMAGES', defaultValue: false, description: 'Build all images using Docker'),
-                    booleanParam(name: 'PUSH_IMAGES', defaultValue: false, description: 'Build and push all images to registry'),
-                    booleanParam(name: 'DEPLOY_TEST', defaultValue: false, description: 'Deploy umbrella chart to test namespace'),
-                    booleanParam(name: 'DEPLOY_PROD', defaultValue: false, description: 'Deploy umbrella chart to prod namespace after manual approval')
+                    string(
+                            name: 'IMAGE_REGISTRY',
+                            defaultValue: 'registry.example.com/my-bank',
+                            description: 'Container registry namespace'
+                    ),
+                    string(
+                            name: 'IMAGE_TAG',
+                            defaultValue: '',
+                            description: 'Image tag. Empty value uses Jenkins BUILD_NUMBER.'
+                    ),
+                    booleanParam(
+                            name: 'BUILD_IMAGES',
+                            defaultValue: false,
+                            description: 'Build all images using Docker'
+                    ),
+                    booleanParam(
+                            name: 'PUSH_IMAGES',
+                            defaultValue: false,
+                            description: 'Build and push all images to registry'
+                    ),
+                    booleanParam(
+                            name: 'DEPLOY_TEST',
+                            defaultValue: false,
+                            description: 'Deploy umbrella chart to test namespace'
+                    ),
+                    booleanParam(
+                            name: 'DEPLOY_PROD',
+                            defaultValue: false,
+                            description: 'Deploy umbrella chart to prod namespace after manual approval'
+                    )
             ])
     ])
 
@@ -129,7 +169,11 @@ def runUmbrellaPipeline() {
         }
 
         stage('☕ Gradle: Contract Tests') {
-            def contractTasks = services.findAll { it.hasContractTests }.collect { ":${it.name}:contractTest" }.join(' ')
+            def contractTasks = services
+                    .findAll { it.hasContractTests }
+                    .collect { ":${it.name}:contractTest" }
+                    .join(' ')
+
             if (contractTasks) {
                 gradle(contractTasks)
             } else {
@@ -145,7 +189,9 @@ def runUmbrellaPipeline() {
             if (params.BUILD_IMAGES || params.PUSH_IMAGES) {
                 services.each { service ->
                     echo "Сборка образа для ${service.name}..."
-                    runCommand("docker build -t ${params.IMAGE_REGISTRY}/${service.image}:${imageTag} ${service.name}")
+                    runCommand(
+                            "docker build -t ${params.IMAGE_REGISTRY}/${service.image}:${imageTag} ${service.name}"
+                    )
                 }
             } else {
                 echo 'Пропуск: сборка образов отключена в параметрах.'
@@ -155,9 +201,14 @@ def runUmbrellaPipeline() {
         stage('🐳 Docker: Push') {
             if (params.PUSH_IMAGES) {
                 withCredentials([
-                        usernamePassword(credentialsId: 'my-bank-registry-credentials', usernameVariable: 'REGISTRY_USERNAME', passwordVariable: 'REGISTRY_PASSWORD')
+                        usernamePassword(
+                                credentialsId: 'my-bank-registry-credentials',
+                                usernameVariable: 'REGISTRY_USERNAME',
+                                passwordVariable: 'REGISTRY_PASSWORD'
+                        )
                 ]) {
                     echo "Авторизация в ${registryHost}..."
+
                     runCommand(
                             'printf "%s" "$REGISTRY_PASSWORD" | docker login ${registryHost} --username "$REGISTRY_USERNAME" --password-stdin',
                             "echo %REGISTRY_PASSWORD%| docker login ${registryHost} --username %REGISTRY_USERNAME% --password-stdin"
@@ -165,7 +216,9 @@ def runUmbrellaPipeline() {
 
                     services.each { service ->
                         echo "Отправка образа ${service.image}..."
-                        runCommand("docker push ${params.IMAGE_REGISTRY}/${service.image}:${imageTag}")
+                        runCommand(
+                                "docker push ${params.IMAGE_REGISTRY}/${service.image}:${imageTag}"
+                        )
                     }
                 }
             } else {
@@ -175,7 +228,9 @@ def runUmbrellaPipeline() {
 
         stage('☸️ K8s: Validation') {
             if (params.DEPLOY_TEST || params.DEPLOY_PROD) {
-                withCredentials([file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')]) {
+                withCredentials([
+                        file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')
+                ]) {
                     runCommand('kubectl cluster-info')
                     runCommand('kubectl get nodes')
                     runCommand('helm version')
@@ -206,6 +261,7 @@ def runUmbrellaPipeline() {
 
         stage('🔎 Helm: Lint Umbrella') {
             def values = serviceValuesArgs(services)
+
             runCommand(
                     "helm lint helm/my-bank -f helm/my-bank/values-test.yaml ${values} " +
                             (params.DEPLOY_TEST ? "-f envs/runtime/values-secrets-test.yaml" : "")
@@ -214,6 +270,7 @@ def runUmbrellaPipeline() {
 
         stage('📄 Helm: Template Render') {
             def values = serviceValuesArgs(services)
+
             runCommand(
                     "helm template my-bank helm/my-bank --namespace test -f helm/my-bank/values-test.yaml ${values} " +
                             (params.DEPLOY_TEST ? "-f envs/runtime/values-secrets-test.yaml" : "") +
@@ -226,7 +283,11 @@ def runUmbrellaPipeline() {
         }
 
         stage('🧪 Test: Prometheus Alerts') {
-            runCommand('promtool test rules helm/charts/spring-service/tests/kafka-publication-alert.test.yaml')
+            runCommand(
+                    'docker run --rm --entrypoint=promtool -v "$PWD:/workspace:ro" prom/prometheus:v3.12.0 test rules /workspace/helm/charts/spring-service/tests/kafka-publication-alert.test.yaml',
+                    'docker run --rm --entrypoint=promtool -v "%CD%:/workspace:ro" prom/prometheus:v3.12.0 test rules /workspace/helm/charts/spring-service/tests/kafka-publication-alert.test.yaml'
+            )
+
             runCommand(
                     'docker run --rm --entrypoint=promtool -v "$PWD/helm/my-bank/files/prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml',
                     'docker run --rm --entrypoint=promtool -v "%CD%\\helm\\my-bank\\files\\prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml'
@@ -236,7 +297,14 @@ def runUmbrellaPipeline() {
         stage('🚀 Deploy: Test Env') {
             if (params.DEPLOY_TEST) {
                 createKeycloakRealmSecret('test')
-                helmDeploy(services, 'test', 'helm/my-bank/values-test.yaml', 'envs/runtime/values-secrets-test.yaml', params.IMAGE_REGISTRY, imageTag)
+                helmDeploy(
+                        services,
+                        'test',
+                        'helm/my-bank/values-test.yaml',
+                        'envs/runtime/values-secrets-test.yaml',
+                        params.IMAGE_REGISTRY,
+                        imageTag
+                )
 
                 executeAllHelmTests('test')
             } else {
@@ -246,7 +314,10 @@ def runUmbrellaPipeline() {
 
         stage('🛑 Approval: Deploy Prod') {
             if (params.DEPLOY_PROD) {
-                input(message: 'Deploy my-bank umbrella release to prod?', ok: 'Deploy')
+                input(
+                        message: 'Deploy my-bank umbrella release to prod?',
+                        ok: 'Deploy'
+                )
             } else {
                 echo "Пропуск."
             }
@@ -263,7 +334,14 @@ def runUmbrellaPipeline() {
         stage('🚀 Deploy: Prod Env') {
             if (params.DEPLOY_PROD) {
                 createKeycloakRealmSecret('prod')
-                helmDeploy(services, 'prod', 'helm/my-bank/values-prod.yaml', 'envs/runtime/values-secrets-prod.yaml', params.IMAGE_REGISTRY, imageTag)
+                helmDeploy(
+                        services,
+                        'prod',
+                        'helm/my-bank/values-prod.yaml',
+                        'envs/runtime/values-secrets-prod.yaml',
+                        params.IMAGE_REGISTRY,
+                        imageTag
+                )
             } else {
                 echo "Пропуск."
             }
