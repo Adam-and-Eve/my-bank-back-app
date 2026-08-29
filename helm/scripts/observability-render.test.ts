@@ -5,22 +5,43 @@ const root = fileURLToPath(new URL("../..", import.meta.url));
 let manifest = "";
 let documents: string[] = [];
 
+const applications = [
+    "front-ui-service",
+    "api-gateway",
+    "account-service",
+    "cash-service",
+    "transfer-service",
+    "notification-service",
+    "exchange-service",
+    "exchange-generator-service",
+    "blocker-service",
+];
+
 function renderChart(namespace = "dev", valuesFile = "helm/my-bank/values-dev.yaml"): string {
+    const cmd = [
+        "helm",
+        "template",
+        "my-bank",
+        "helm/my-bank",
+        "--namespace",
+        namespace,
+        "-f",
+        valuesFile,
+        "--set", "global.imageRegistry=test.registry.com",
+        "--set", "global.imageTag=latest"
+    ];
+
+    applications.forEach(app => {
+        cmd.push("-f", `helm/values/services/${app}.yaml`);
+    });
+
     const result = Bun.spawnSync({
-        cmd: [
-            "helm",
-            "template",
-            "my-bank",
-            "helm/my-bank",
-            "--namespace",
-            namespace,
-            "-f",
-            valuesFile,
-        ],
+        cmd: cmd,
         cwd: root,
         stdout: "pipe",
         stderr: "pipe",
     });
+
     if (result.exitCode !== 0) {
         throw new Error(result.stderr.toString());
     }
@@ -122,17 +143,6 @@ describe("observability Helm render", () => {
     });
 
     test("renders application ServiceMonitors and five bank alerts", () => {
-        const applications = [
-            "front-ui-service",
-            "api-gateway",
-            "account-service",
-            "cash-service",
-            "transfer-service",
-            "notification-service",
-            "exchange-service",
-            "exchange-generator-service",
-            "blocker-service",
-        ];
         for (const application of applications) {
             const serviceMonitor = namedResource("ServiceMonitor", application);
             expect(serviceMonitor).toContain("my-bank/management-service: \"true\"");
