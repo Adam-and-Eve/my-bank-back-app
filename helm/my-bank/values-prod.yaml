@@ -52,6 +52,12 @@ monitoring:
       enabled: false
     tls:
       enabled: false
+    clusterRole:
+      enabled: false
+      role:
+        enabled: true
+      namespaces:
+        releaseNamespace: true
   prometheus:
     prometheusSpec:
       ruleSelectorNilUsesHelmValues: false
