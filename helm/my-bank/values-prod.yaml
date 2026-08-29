@@ -46,9 +46,9 @@ monitoring:
       namespaced: true
     sidecar:
       dashboards:
-        searchNamespace: test
+        searchNamespace: prod
       datasources:
-        searchNamespace: test
+        searchNamespace: prod
   kube-state-metrics:
     rbac:
       useClusterRole: false

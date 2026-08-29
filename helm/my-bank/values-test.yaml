@@ -43,14 +43,14 @@ monitoring:
   grafana:
     rbac:
       namespaced: true
-  kube-state-metrics:
-    rbac:
-      useClusterRole: false
     sidecar:
       dashboards:
         searchNamespace: test
       datasources:
         searchNamespace: test
+  kube-state-metrics:
+    rbac:
+      useClusterRole: false
   prometheusOperator:
     admissionWebhooks:
       enabled: false
