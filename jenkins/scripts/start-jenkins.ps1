@@ -100,6 +100,8 @@ docker run `
     --restart=on-failure `
     --detach `
     --network $Network `
+    --dns 8.8.8.8 `
+    --dns 1.1.1.1 `
     --env DOCKER_HOST=tcp://docker:2376 `
     --env DOCKER_CERT_PATH=/certs/client `
     --env DOCKER_TLS_VERIFY=1 `
