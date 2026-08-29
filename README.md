@@ -187,10 +187,6 @@ cmd /c "sops --encrypt ./helm/my-bank/secrets/values-secrets-prod.yaml > ./envs/
 ```
 
 ```bash
-cmd /c "sops --encrypt ./helm/my-bank/secrets/values-secrets-prod.yaml > ./envs/secrets/values-secrets-prod.enc.yaml"
-```
-
-```bash
 cmd /c "sops --encrypt ./keycloak/realms/my-bank-realm-realm.json > ./envs/secrets/my-bank-realm-realm.enc.json"
 ```
 
