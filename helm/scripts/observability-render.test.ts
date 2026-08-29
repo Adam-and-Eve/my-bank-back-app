@@ -31,9 +31,10 @@ function renderChart(
         "-f",
         valuesFile,
         "--set",
-        "global.imageRegistry=test.registry.com",
+        // ИСПРАВЛЕНО: используем новые изолированные переменные
+        "global.bankImageRegistry=test.registry.com",
         "--set",
-        "global.imageTag=latest",
+        "global.bankImageTag=latest",
     ];
 
     applications.forEach((app) => {
@@ -67,9 +68,9 @@ function namedResource(kind: string, name: string): string {
 
     if (!resource) {
         throw new Error(`${kind}/${name} was not rendered`);
-}
+    }
 
-return resource;
+    return resource;
 }
 
 function optionalNamedResource(
