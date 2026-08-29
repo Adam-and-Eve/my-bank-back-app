@@ -19,10 +19,8 @@ dependencies {
     implementation(libs.spring.boot.starter.web)
     implementation(libs.spring.boot.starter.data.jpa)
     implementation(libs.spring.boot.starter.validation)
-    implementation(libs.spring.boot.starter.actuator)
     implementation(libs.spring.boot.starter.aop)
     implementation(libs.spring.boot.starter.oauth2.resource.server)
-    implementation(libs.datasource.micrometer.spring.boot)
     implementation(libs.spring.retry)
     implementation(libs.spring.kafka)
 
@@ -30,6 +28,12 @@ dependencies {
     runtimeOnly(libs.flyway.database.postgresql)
     runtimeOnly(libs.postgresql)
 
+    implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.datasource.micrometer.spring.boot)
+    runtimeOnly(libs.micrometer.registry.prometheus)
+    implementation(libs.logstash.logback.encoder)
+    implementation(libs.micrometer.tracing.bridge.brave)
+    implementation(libs.zipkin.reporter.brave)
 
     testImplementation(libs.spring.boot.starter.test)
     testImplementation(libs.spring.cloud.starter.contract.verifier)
