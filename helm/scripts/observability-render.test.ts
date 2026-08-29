@@ -31,7 +31,6 @@ function renderChart(
         "-f",
         valuesFile,
         "--set",
-        // ИСПРАВЛЕНО: используем новые изолированные переменные
         "global.bankImageRegistry=test.registry.com",
         "--set",
         "global.bankImageTag=latest",
