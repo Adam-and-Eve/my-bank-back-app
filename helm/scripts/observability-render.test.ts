@@ -17,7 +17,10 @@ const applications = [
     "blocker-service",
 ];
 
-function renderChart(namespace = "dev", valuesFile = "helm/my-bank/values-dev.yaml"): string {
+function renderChart(
+    namespace = "dev",
+    valuesFile = "helm/my-bank/values-dev.yaml",
+): string {
     const cmd = [
         "helm",
         "template",
@@ -27,16 +30,18 @@ function renderChart(namespace = "dev", valuesFile = "helm/my-bank/values-dev.ya
         namespace,
         "-f",
         valuesFile,
-        "--set", "global.imageRegistry=test.registry.com",
-        "--set", "global.imageTag=latest"
+        "--set",
+        "global.imageRegistry=test.registry.com",
+        "--set",
+        "global.imageTag=latest",
     ];
 
-    applications.forEach(app => {
+    applications.forEach((app) => {
         cmd.push("-f", `helm/values/services/${app}.yaml`);
     });
 
     const result = Bun.spawnSync({
-        cmd: cmd,
+        cmd,
         cwd: root,
         stdout: "pipe",
         stderr: "pipe",
@@ -45,6 +50,7 @@ function renderChart(namespace = "dev", valuesFile = "helm/my-bank/values-dev.ya
     if (result.exitCode !== 0) {
         throw new Error(result.stderr.toString());
     }
+
     return result.stdout.toString();
 }
 
@@ -58,13 +64,18 @@ function namedResource(kind: string, name: string): string {
     const resource = resources(kind).find((document) =>
         new RegExp(`^  name: ${name}$`, "m").test(document),
     );
+
     if (!resource) {
         throw new Error(`${kind}/${name} was not rendered`);
-    }
-    return resource;
 }
 
-function optionalNamedResource(kind: string, name: string): string | undefined {
+return resource;
+}
+
+function optionalNamedResource(
+    kind: string,
+    name: string,
+): string | undefined {
     return resources(kind).find((document) =>
         new RegExp(`^  name: ${name}$`, "m").test(document),
     );
@@ -74,13 +85,23 @@ function renderedDocuments(renderedManifest: string): string[] {
     return renderedManifest.split(/\r?\n---\r?\n/);
 }
 
-function resourceFromDocuments(renderedDocuments: string[], kind: string, name: string): string {
+function resourceFromDocuments(
+    renderedDocuments: string[],
+    kind: string,
+    name: string,
+): string {
     const resource = renderedDocuments
-        .filter((document) => new RegExp(`^kind: ${kind}$`, "m").test(document))
-        .find((document) => new RegExp(`^  name: ${name}$`, "m").test(document));
+        .filter((document) =>
+            new RegExp(`^kind: ${kind}$`, "m").test(document),
+        )
+        .find((document) =>
+            new RegExp(`^  name: ${name}$`, "m").test(document),
+        );
+
     if (!resource) {
         throw new Error(`${kind}/${name} was not rendered`);
     }
+
     return resource;
 }
 
@@ -103,10 +124,16 @@ describe("observability Helm render", () => {
         expect(manifest).toContain(
             "docker.elastic.co/elasticsearch/elasticsearch:9.4.3",
         );
-        expect(manifest).toContain("docker.elastic.co/logstash/logstash:9.4.3");
-        expect(manifest).toContain("docker.elastic.co/kibana/kibana:9.4.3");
+        expect(manifest).toContain(
+            "docker.elastic.co/logstash/logstash:9.4.3",
+        );
+        expect(manifest).toContain(
+            "docker.elastic.co/kibana/kibana:9.4.3",
+        );
         expect(manifest).toContain("curlimages/curl:8.21.0");
-        expect(manifest).not.toMatch(/(?:zipkin|elasticsearch|logstash|kibana):latest/);
+        expect(manifest).not.toMatch(
+            /(?:zipkin|elasticsearch|logstash|kibana):latest/,
+        );
     });
 
     test.each([
@@ -117,6 +144,7 @@ describe("observability Helm render", () => {
         ["grafana", 80],
     ])("renders ClusterIP service %s:%d", (name, port) => {
         const service = namedResource("Service", name);
+
         expect(service).toContain("type: ClusterIP");
         expect(service).toContain(`port: ${port}`);
     });
@@ -125,45 +153,91 @@ describe("observability Helm render", () => {
         expect(namedResource("PersistentVolumeClaim", "grafana")).toContain(
             'storage: "1Gi"',
         );
-        expect(namedResource("Prometheus", "my-bank-monitoring-prometheus")).toContain(
-            "storage: 5Gi",
-        );
+        expect(
+            namedResource(
+                "Prometheus",
+                "my-bank-monitoring-prometheus",
+            ),
+        ).toContain("storage: 5Gi");
         expect(namedResource("StatefulSet", "elasticsearch")).toContain(
             "storage: 5Gi",
         );
     });
 
     test("renders startup and readiness probes", () => {
-        const elasticsearch = namedResource("StatefulSet", "elasticsearch");
+        const elasticsearch = namedResource(
+            "StatefulSet",
+            "elasticsearch",
+        );
+
         expect(elasticsearch).toContain("startupProbe:");
         expect(elasticsearch).toContain("readinessProbe:");
-        expect(namedResource("Deployment", "logstash")).toContain("startupProbe:");
-        expect(namedResource("Deployment", "kibana")).toContain("readinessProbe:");
-        expect(namedResource("Deployment", "zipkin")).toContain("startupProbe:");
+        expect(namedResource("Deployment", "logstash")).toContain(
+            "startupProbe:",
+        );
+        expect(namedResource("Deployment", "kibana")).toContain(
+            "readinessProbe:",
+        );
+        expect(namedResource("Deployment", "zipkin")).toContain(
+            "startupProbe:",
+        );
     });
 
     test("renders application ServiceMonitors and five bank alerts", () => {
         for (const application of applications) {
-            const serviceMonitor = optionalNamedResource("ServiceMonitor", application);
+            const serviceMonitor = optionalNamedResource(
+                "ServiceMonitor",
+                application,
+            );
+
             if (serviceMonitor) {
-                expect(serviceMonitor).toContain("bank/management-service: \"true\"");
+                expect(serviceMonitor).toContain(
+                    'bank/management-service: "true"',
+                );
                 expect(serviceMonitor).toContain("port: management");
-                expect(serviceMonitor).toContain("path: /actuator/prometheus");
+                expect(serviceMonitor).toContain(
+                    "path: /actuator/prometheus",
+                );
             }
 
-            const managementService = optionalNamedResource("Service", `${application}-management`);
+            const managementService = optionalNamedResource(
+                "Service",
+                `${application}-management`,
+            );
+
             if (managementService) {
-                expect(managementService).toContain("bank/management-service: \"true\"");
+                expect(managementService).toContain(
+                    'bank/management-service: "true"',
+                );
                 expect(managementService).toContain("name: management");
             }
 
-            const applicationService = optionalNamedResource("Service", application);
+            const applicationService = optionalNamedResource(
+                "Service",
+                application,
+            );
+
             if (applicationService) {
-                expect(applicationService).not.toContain("bank/management-service: \"true\"");
+                expect(applicationService).not.toContain(
+                    'bank/management-service: "true"',
+                );
             }
         }
+
         const rule = namedResource("PrometheusRule", "my-bank-alerts");
-        expect((rule.match(/- alert: Bank/g) ?? []).length).toBe(5);
+
+        const expectedAlerts = [
+            "MyBankHttp5xxRatioHigh",
+            "MyBankHttpP95LatencyHigh",
+            "MyBankWithdrawalFailuresHigh",
+            "MyBankTransferFailuresHigh",
+            "MyBankNotificationDeliveryFailed",
+        ];
+
+        for (const alert of expectedAlerts) {
+            expect(rule).toContain(`alert: ${alert}`);
+        }
+
         expect(rule).toContain("clamp_min");
     });
 
@@ -172,23 +246,30 @@ describe("observability Helm render", () => {
             ...resources("HTTPRoute"),
             ...resources("Ingress"),
         ].join("\n");
+
         expect(publicRoutes).not.toMatch(
             /\b(zipkin|prometheus|grafana|elasticsearch|logstash|kibana)\b/i,
         );
     });
 
     test("does not render plaintext Grafana credentials", () => {
-        expect(manifest).toContain("name: grafana-admin-credentials");
+        expect(manifest).toContain(
+            "name: grafana-admin-credentials",
+        );
         expect(manifest).not.toMatch(/adminPassword:\s*\S+/);
         expect(manifest).not.toMatch(/admin-password:\s*\S+/);
     });
 
     test("keeps the Elastic Stack on one version", () => {
         const elasticImages =
-            manifest.match(/docker\.elastic\.co\/(?:elasticsearch\/elasticsearch|logstash\/logstash|kibana\/kibana):[^\s"]+/g) ??
-            [];
+            manifest.match(
+                /docker\.elastic\.co\/(?:elasticsearch\/elasticsearch|logstash\/logstash|kibana\/kibana):[^\s"]+/g,
+            ) ?? [];
+
         expect(elasticImages).toHaveLength(3);
-        expect(elasticImages.every((image) => image.endsWith(":9.4.3"))).toBeTrue();
+        expect(
+            elasticImages.every((image) => image.endsWith(":9.4.3")),
+        ).toBeTrue();
     });
 
     test.each([
@@ -198,8 +279,14 @@ describe("observability Helm render", () => {
     ])(
         "renders Elastic Stack observability checks for %s only when enabled",
         (namespace, valuesFile, shouldRenderElasticStackChecks) => {
-            const renderedManifest = namespace === "dev" ? manifest : renderChart(namespace, valuesFile);
-            const observabilityJob = observabilityTestJob(renderedManifest);
+            const renderedManifest =
+                namespace === "dev"
+                    ? manifest
+                    : renderChart(namespace, valuesFile);
+
+            const observabilityJob =
+                observabilityTestJob(renderedManifest);
+
             const elasticStackChecks = [
                 'check_url "Elasticsearch health" "http://elasticsearch:9200/_cluster/health"',
                 'check_url "Logstash API" "http://logstash:9600/_node/pipelines/bank-logs"',
