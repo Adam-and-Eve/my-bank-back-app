@@ -2,7 +2,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: {{ include "bank.fullname" . }}-alerts
+  name: {{ include "my-bank.fullname" . }}-alerts
   labels:
     {{- include "my-bank.labels" . | nindent 4 }}
 spec:
