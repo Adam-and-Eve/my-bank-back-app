@@ -12,8 +12,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
-import java.util.Locale;
-
 /**
  * <summary>
  * Реализация издателя событий уведомлений, осуществляющая отправку сообщений в брокер Apache Kafka.
@@ -128,17 +126,20 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
     private String errorCategory(Throwable exception) {
         var cause = rootCause(exception);
 
-        if (cause instanceof TimeoutException) {
+        if (cause instanceof TimeoutException ||
+                cause instanceof java.util.concurrent.TimeoutException) {
             return "timeout";
         }
 
         if (cause instanceof SerializationException ||
-                cause instanceof JsonProcessingException) {
+                cause instanceof JsonProcessingException ||
+                cause instanceof java.io.NotSerializableException) {
             return "serialization";
         }
 
         if (cause instanceof AuthenticationException ||
-                cause instanceof AuthorizationException) {
+                cause instanceof AuthorizationException ||
+                cause instanceof javax.naming.AuthenticationException) {
             return "security";
         }
 
