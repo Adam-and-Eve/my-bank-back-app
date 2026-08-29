@@ -36,7 +36,7 @@ groups:
         annotations:
           summary: My Bank withdrawal failures are high
           description: More than three withdrawal failures occurred during the last ten minutes.
-          runbook_url: README.md#bank-withdrawal-failures-high
+          runbook_url: README.md#my-bank-withdrawal-failures-high
       - alert: MyBankTransferFailuresHigh
         expr: sum(increase(my_bank_transfer_failures_total[10m])) > 3
         for: 1m
