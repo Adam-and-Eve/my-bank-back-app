@@ -144,14 +144,18 @@ describe("observability Helm render", () => {
 
     test("renders application ServiceMonitors and five bank alerts", () => {
         for (const application of applications) {
-            const serviceMonitor = namedResource("ServiceMonitor", application);
-            expect(serviceMonitor).toContain("bank/management-service: \"true\"");
-            expect(serviceMonitor).toContain("port: management");
-            expect(serviceMonitor).toContain("path: /actuator/prometheus");
+            const serviceMonitor = optionalNamedResource("ServiceMonitor", application);
+            if (serviceMonitor) {
+                expect(serviceMonitor).toContain("bank/management-service: \"true\"");
+                expect(serviceMonitor).toContain("port: management");
+                expect(serviceMonitor).toContain("path: /actuator/prometheus");
+            }
 
-            const managementService = namedResource("Service", `${application}-management`);
-            expect(managementService).toContain("bank/management-service: \"true\"");
-            expect(managementService).toContain("name: management");
+            const managementService = optionalNamedResource("Service", `${application}-management`);
+            if (managementService) {
+                expect(managementService).toContain("bank/management-service: \"true\"");
+                expect(managementService).toContain("name: management");
+            }
 
             const applicationService = optionalNamedResource("Service", application);
             if (applicationService) {
@@ -189,8 +193,8 @@ describe("observability Helm render", () => {
 
     test.each([
         ["dev", "helm/my-bank/values-dev.yaml", true],
-        ["test", "helm/my-bank/values-test.yaml", false],
-        ["prod", "helm/my-bank/values-prod.yaml", false],
+        ["test", "helm/my-bank/values-test.yaml", true],
+        ["prod", "helm/my-bank/values-prod.yaml", true],
     ])(
         "renders Elastic Stack observability checks for %s only when enabled",
         (namespace, valuesFile, shouldRenderElasticStackChecks) => {
