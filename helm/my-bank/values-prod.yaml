@@ -41,3 +41,20 @@ keycloak:
 
 monitoring:
   enabled: true
+  grafana:
+    rbac:
+      namespaced: true
+  kube-state-metrics:
+    rbac:
+      useClusterRole: false
+  prometheusOperator:
+    admissionWebhooks:
+      enabled: false
+  prometheus:
+    prometheusSpec:
+      ruleSelectorNilUsesHelmValues: false
+      serviceMonitorSelectorNilUsesHelmValues: false
+      podMonitorSelectorNilUsesHelmValues: false
+      podMonitorNamespaceSelector: {}
+      serviceMonitorNamespaceSelector: {}
+      ruleNamespaceSelector: {}
