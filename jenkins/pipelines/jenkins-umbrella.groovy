@@ -65,9 +65,6 @@ def helmDeploy(
         def values = serviceValuesArgs(services)
         def command = "helm upgrade --install my-bank helm/my-bank --namespace ${namespace} --create-namespace --atomic --wait --wait-for-jobs --timeout 30m -f ${valuesFile} ${values} -f ${secretsFile} --set global.imageRegistry=${imageRegistry} --set global.imageTag=${imageTag}"
 
-        echo "🚀 Выполняем Helm Dry-Run..."
-        runCommand("${command} --dry-run")
-
         echo "🚀 Выполняем боевой Helm Deploy..."
         runCommand(command)
     }
