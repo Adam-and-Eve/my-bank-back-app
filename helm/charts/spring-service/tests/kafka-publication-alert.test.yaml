@@ -15,3 +15,6 @@ tests:
           - exp_labels:
               severity: warning
               application: account-service
+            exp_annotations:
+              summary: "Kafka notification publication failures in account-service"
+              description: "The account-service has experienced Kafka publication failures in the last 15 minutes."
