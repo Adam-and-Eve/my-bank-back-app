@@ -1,6 +1,6 @@
 {{- $global := default dict .Values.global -}}
-  {{- $registry := default "" (get $global "imageRegistry") -}}
-  {{- $tag := default .Values.image.tag (get $global "imageTag") -}}
+  {{- $registry := default "" (get $global "bankImageRegistry") -}}
+  {{- $tag := default .Values.image.tag (get $global "bankImageTag") -}}
   {{- $repository := required "image.repository is required" .Values.image.repository -}}
   {{- if $registry -}}
   {{- $repository = printf "%s/%s" (trimSuffix "/" $registry) $repository -}}

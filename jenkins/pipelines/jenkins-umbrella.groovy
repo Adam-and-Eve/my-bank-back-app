@@ -63,7 +63,7 @@ def helmDeploy(
             file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')
     ]) {
         def values = serviceValuesArgs(services)
-        def command = "helm upgrade --install my-bank helm/my-bank --namespace ${namespace} --create-namespace --atomic --wait --wait-for-jobs --timeout 30m -f ${valuesFile} ${values} -f ${secretsFile} --set global.imageRegistry=${imageRegistry} --set global.imageTag=${imageTag}"
+        def command = "helm upgrade --install my-bank helm/my-bank --namespace ${namespace} --create-namespace --atomic --wait --wait-for-jobs --timeout 30m -f ${valuesFile} ${values} -f ${secretsFile} --set global.bankImageRegistry=${imageRegistry} --set global.bankImageTag=${imageTag}"
 
         echo "🚀 Выполняем боевой Helm Deploy..."
         runCommand(command)
@@ -271,7 +271,7 @@ def runUmbrellaPipeline() {
             runCommand(
                     "helm template my-bank helm/my-bank --namespace test -f helm/my-bank/values-test.yaml ${values} " +
                             (params.DEPLOY_TEST ? "-f envs/runtime/values-secrets-test.yaml" : "") +
-                            " --set global.imageRegistry=${params.IMAGE_REGISTRY} --set global.imageTag=${imageTag}"
+                            " --set global.bankImageRegistry=${params.IMAGE_REGISTRY} --set global.bankImageTag=${imageTag}"
             )
         }
 
