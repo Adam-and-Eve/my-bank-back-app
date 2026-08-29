@@ -185,6 +185,14 @@ def runUmbrellaPipeline() {
             }
         }
 
+        stage('🔐 Secrets: Decrypt Test') {
+            if (params.DEPLOY_TEST) {
+                decryptSecrets('test')
+            } else {
+                echo "Пропуск (DEPLOY_TEST выключен)."
+            }
+        }
+
         stage('📦 Helm: Update Dependencies') {
             runCommand('helm dependency update helm/my-bank')
         }
@@ -223,14 +231,6 @@ def runUmbrellaPipeline() {
                     'docker run --rm --entrypoint=promtool -v "$PWD/helm/my-bank/files/prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml',
                     'docker run --rm --entrypoint=promtool -v "%CD%\\helm\\my-bank\\files\\prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml'
             )
-        }
-
-        stage('🔐 Secrets: Decrypt Test') {
-            if (params.DEPLOY_TEST) {
-                decryptSecrets('test')
-            } else {
-                echo "Пропуск."
-            }
         }
 
         stage('🚀 Deploy: Test Env') {
