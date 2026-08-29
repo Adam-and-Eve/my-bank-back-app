@@ -371,7 +371,7 @@ def runUmbrellaPipeline() {
                             " --set global.imageTag=${imageTag}"
             )
 
-            runCommand('bun test scripts/bun/helm/observability-render.test.ts')
+            runCommand('bun test helm/scripts/observability-render.test.ts')
 
             runCommand('promtool test rules helm/charts/spring-service/tests/kafka-publication-alert.test.yaml')
 
