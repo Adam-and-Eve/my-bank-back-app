@@ -67,7 +67,7 @@ function observabilityTestJob(renderedManifest: string): string {
     return resourceFromDocuments(
         renderedDocuments(renderedManifest),
         "Job",
-        "bank-observability-test",
+        "my-bank-observability-test",
     );
 }
 
@@ -104,7 +104,7 @@ describe("observability Helm render", () => {
         expect(namedResource("PersistentVolumeClaim", "grafana")).toContain(
             'storage: "1Gi"',
         );
-        expect(namedResource("Prometheus", "bank-monitoring-prometheus")).toContain(
+        expect(namedResource("Prometheus", "my-bank-monitoring-prometheus")).toContain(
             "storage: 5Gi",
         );
         expect(namedResource("StatefulSet", "elasticsearch")).toContain(
@@ -135,21 +135,21 @@ describe("observability Helm render", () => {
         ];
         for (const application of applications) {
             const serviceMonitor = namedResource("ServiceMonitor", application);
-            expect(serviceMonitor).toContain("bank/management-service: \"true\"");
+            expect(serviceMonitor).toContain("my-bank/management-service: \"true\"");
             expect(serviceMonitor).toContain("port: management");
             expect(serviceMonitor).toContain("path: /actuator/prometheus");
 
             const managementService = namedResource("Service", `${application}-management`);
-            expect(managementService).toContain("bank/management-service: \"true\"");
+            expect(managementService).toContain("my-bank/management-service: \"true\"");
             expect(managementService).toContain("name: management");
 
             const applicationService = optionalNamedResource("Service", application);
             if (applicationService) {
-                expect(applicationService).not.toContain("bank/management-service: \"true\"");
+                expect(applicationService).not.toContain("my-bank/management-service: \"true\"");
             }
         }
-        const rule = namedResource("PrometheusRule", "bank-alerts");
-        expect((rule.match(/- alert: Bank/g) ?? []).length).toBe(5);
+        const rule = namedResource("PrometheusRule", "my-bank-alerts");
+        expect((rule.match(/- alert: MyBank/g) ?? []).length).toBe(5);
         expect(rule).toContain("clamp_min");
     });
 
@@ -188,7 +188,7 @@ describe("observability Helm render", () => {
             const observabilityJob = observabilityTestJob(renderedManifest);
             const elasticStackChecks = [
                 'check_url "Elasticsearch health" "http://elasticsearch:9200/_cluster/health"',
-                'check_url "Logstash API" "http://logstash:9600/_node/pipelines/bank-logs"',
+                'check_url "Logstash API" "http://logstash:9600/_node/pipelines/my-bank-logs"',
                 "telnet://logstash:5000",
                 'check_url "Kibana status" "http://kibana:5601/api/status"',
             ];

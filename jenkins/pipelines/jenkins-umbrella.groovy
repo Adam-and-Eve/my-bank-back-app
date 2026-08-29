@@ -376,8 +376,8 @@ def runUmbrellaPipeline() {
             runCommand('promtool test rules helm/charts/spring-service/tests/kafka-publication-alert.test.yaml')
 
             runCommand(
-                    'docker run --rm --entrypoint=promtool -v "$PWD/helm/my-bank/files/prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/bank-alerts.test.yaml',
-                    'docker run --rm --entrypoint=promtool -v "%CD%\\helm\\my-bank\\files\\prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/bank-alerts.test.yaml'
+                    'docker run --rm --entrypoint=promtool -v "$PWD/helm/my-bank/files/prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml',
+                    'docker run --rm --entrypoint=promtool -v "%CD%\\helm\\my-bank\\files\\prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml'
             )
         }
 
