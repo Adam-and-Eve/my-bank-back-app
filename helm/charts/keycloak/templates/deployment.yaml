@@ -20,30 +20,27 @@ spec:
         - name: keycloak
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-
           args:
             - start-dev
             {{- if .Values.realmImport.enabled }}
             - --import-realm
             {{- end }}
-
           env:
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               valueFrom:
                 secretKeyRef:
                   name: {{ required "admin.existingSecret is required" .Values.admin.existingSecret }}
                   key: {{ required "admin.usernameKey is required" .Values.admin.usernameKey }}
-
             - name: KC_BOOTSTRAP_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ required "admin.existingSecret is required" .Values.admin.existingSecret }}
                   key: {{ required "admin.passwordKey is required" .Values.admin.passwordKey }}
-
+            - name: KC_HEALTH_ENABLED
+              value: "true"
             {{- if .Values.realmImport.enabled }}
             - name: BANK_PUBLIC_BASE_URL
               value: {{ required "realmImport.frontUiPublicUrl is required" .Values.realmImport.frontUiPublicUrl | quote }}
-
             {{- range .Values.realmImport.secretEnv }}
             - name: {{ required "realmImport.secretEnv[].name is required" .name }}
               valueFrom:
@@ -52,27 +49,49 @@ spec:
                   key: {{ required "realmImport.secretEnv[].key is required" .key }}
             {{- end }}
             {{- end }}
-
             {{- range .Values.extraEnv }}
             - name: {{ required "extraEnv[].name is required" .name }}
               value: {{ required "extraEnv[].value is required" .value | quote }}
             {{- end }}
-
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-
+            - name: management
+              containerPort: {{ .Values.management.port }}
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path | quote }}
+              port: {{ .Values.probes.port }}
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path | quote }}
+              port: {{ .Values.probes.port }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path | quote }}
+              port: {{ .Values.probes.port }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
           {{- if .Values.realmImport.enabled }}
           volumeMounts:
             - name: realm
               mountPath: /opt/keycloak/data/import
               readOnly: true
           {{- end }}
-
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-
       {{- if .Values.realmImport.enabled }}
       volumes:
         - name: realm

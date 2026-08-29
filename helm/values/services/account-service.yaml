@@ -9,6 +9,16 @@ account-service:
   service:
     port: 8081
 
+  management:
+    enabled: true
+    port: 8091
+    monitoring:
+      enabled: true
+      alert:
+        enabled: false
+  probes:
+    port: management
+
   env:
     BANK_DATASOURCE_URL: jdbc:postgresql://postgresql:5432/my-bank
     BANK_DATASOURCE_USERNAME: postgres
@@ -17,6 +27,7 @@ account-service:
     BANK_BALANCE_RETRY_BACKOFF_MS: "50"
     BANK_BALANCE_RETRY_MAX_ATTEMPTS: "3"
     SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    MANAGEMENT_SERVER_PORT: "8091"
     SERVER_PORT: "8081"
 
   secretEnv:

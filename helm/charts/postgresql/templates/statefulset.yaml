@@ -7,50 +7,81 @@ metadata:
 spec:
   serviceName: {{ include "postgresql.fullname" . }}
   replicas: {{ .Values.replicaCount }}
-
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "postgresql.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
-
   template:
     metadata:
       labels:
         {{- include "postgresql.labels" . | nindent 8 }}
-
     spec:
       serviceAccountName: {{ include "postgresql.fullname" . }}
-
       containers:
         - name: postgresql
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-
           ports:
             - name: postgresql
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-
           env:
             - name: POSTGRES_DB
               value: {{ .Values.auth.database | quote }}
-
             - name: POSTGRES_USER
               value: {{ .Values.auth.username | quote }}
-
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ required "auth.existingSecret is required" .Values.auth.existingSecret }}
                   key: {{ required "auth.passwordKey is required" .Values.auth.passwordKey }}
-
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql
-
+          startupProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.auth.username | quote }}
+                - -d
+                - {{ .Values.auth.database | quote }}
+                - -p
+                - {{ .Values.service.port | quote }}
+            initialDelaySeconds: {{ .Values.probes.startup.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.auth.username | quote }}
+                - -d
+                - {{ .Values.auth.database | quote }}
+                - -p
+                - {{ .Values.service.port | quote }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - {{ .Values.auth.username | quote }}
+                - -d
+                - {{ .Values.auth.database | quote }}
+                - -p
+                - {{ .Values.service.port | quote }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-
       volumes:
         - name: data
           persistentVolumeClaim:

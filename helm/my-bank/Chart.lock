@@ -35,5 +35,20 @@ dependencies:
 - name: kafka
   repository: file://../charts/kafka
   version: 0.1.0
-digest: sha256:af95e6770ddcf106a576928ef3abbdcb84bf6787f06ecaed6a6724264cff8a91
-generated: "2026-08-27T16:15:06.6414122-04:00"
+- name: kube-prometheus-stack
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 87.4.0
+- name: zipkin
+  repository: file://../charts/zipkin
+  version: 0.1.0
+- name: elasticsearch
+  repository: file://../charts/elasticsearch
+  version: 0.1.0
+- name: logstash
+  repository: file://../charts/logstash
+  version: 0.1.0
+- name: kibana
+  repository: file://../charts/kibana
+  version: 0.1.0
+digest: sha256:2b53398e74caafa9a03938ec4dbdd398f4f88eada9e436f26ec8180efea018ae
+generated: "2026-08-29T07:04:53.9840206-04:00"

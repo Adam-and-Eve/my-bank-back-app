@@ -13,7 +13,16 @@ gatewayApi:
 kafka:
   clusterId: o5ir33Fm72lElPleLS-9o1
 
-front-ui:
+elasticsearch:
+  enabled: true
+
+logstash:
+  enabled: true
+
+kibana:
+  enabled: true
+
+front-ui-service:
   env:
     BANK_PUBLIC_BASE_URL: http://localhost:8080
     BANK_KEYCLOAK_AUTHORIZATION_URI: http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/auth

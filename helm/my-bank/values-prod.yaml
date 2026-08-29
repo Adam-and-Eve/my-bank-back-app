@@ -13,6 +13,15 @@ gatewayApi:
 kafka:
   clusterId: Hz5JRp00D1iXfKZoXfO-k
 
+elasticsearch:
+  enabled: true
+
+logstash:
+  enabled: true
+
+kibana:
+  enabled: true
+
 front-ui-service:
   env:
     BANK_PUBLIC_BASE_URL: http://localhost:8080
