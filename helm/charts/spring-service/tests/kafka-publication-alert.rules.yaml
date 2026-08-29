@@ -2,7 +2,7 @@ groups:
   - name: account-service.kafka
     rules:
       - alert: KafkaNotificationPublicationFailures
-        expr: sum(increase(bank_kafka_publication_failures_total{application="account-service"}[15m])) > 0
+        expr: sum(increase(my_bank_kafka_publication_failures_total{application="account-service"}[15m])) > 0
         for: 1m
         labels:
           severity: warning

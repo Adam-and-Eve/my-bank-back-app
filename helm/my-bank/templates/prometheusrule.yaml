@@ -1,4 +1,4 @@
-{{- $rules := .Files.Get "files/prometheus-rules/bank-alerts.yaml" | fromYaml -}}
+{{- $rules := .Files.Get "files/prometheus-rules/my-bank-alerts.yaml" | fromYaml -}}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:

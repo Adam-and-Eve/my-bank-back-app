@@ -16,57 +16,57 @@ tests:
         values: '0+100x10'
       - series: 'http_server_requests_seconds_bucket{application="cash-service",le="+Inf"}'
         values: '0+100x10'
-      - series: 'bank_cash_withdrawal_failures_total{login="alexey"}'
+      - series: 'my_bank_cash_withdrawal_failures_total{login="alexey"}'
         values: '0+1x10'
-      - series: 'bank_transfer_failures_total{sender_login="alexey",recipient_login="dmitry"}'
+      - series: 'my_bank_transfer_failures_total{sender_login="alexey",recipient_login="dmitry"}'
         values: '0+1x10'
-      - series: 'bank_notification_delivery_failures_total{recipient_login="alexey"}'
+      - series: 'my_bank_notification_delivery_failures_total{recipient_login="alexey"}'
         values: '0+1x10'
     alert_rule_test:
       - eval_time: 10m
-        alertname: BankHttp5xxRatioHigh
+        alertname: MyBankHttp5xxRatioHigh
         exp_alerts:
           - exp_labels:
               application: cash-service
               severity: warning
             exp_annotations:
-              summary: Bank HTTP 5xx ratio is high
+              summary: My Bank HTTP 5xx ratio is high
               description: More than 5% of HTTP requests return 5xx for application cash-service.
-              runbook_url: README.md#bank-http-5xx-ratio-high
+              runbook_url: README.md#my-bank-http-5xx-ratio-high
       - eval_time: 10m
-        alertname: BankHttpP95LatencyHigh
+        alertname: MyBankHttpP95LatencyHigh
         exp_alerts:
           - exp_labels:
               application: cash-service
               severity: warning
             exp_annotations:
-              summary: Bank HTTP p95 latency is high
+              summary: My Bank HTTP p95 latency is high
               description: HTTP p95 latency exceeds one second for application cash-service.
-              runbook_url: README.md#bank-http-p95-latency-high
+              runbook_url: README.md#my-bank-http-p95-latency-high
       - eval_time: 10m
-        alertname: BankWithdrawalFailuresHigh
+        alertname: MyBankWithdrawalFailuresHigh
         exp_alerts:
           - exp_labels:
               severity: warning
             exp_annotations:
-              summary: Bank withdrawal failures are high
+              summary: My Bank withdrawal failures are high
               description: More than three withdrawal failures occurred during the last ten minutes.
-              runbook_url: README.md#bank-withdrawal-failures-high
+              runbook_url: README.md#my-bank-withdrawal-failures-high
       - eval_time: 10m
-        alertname: BankTransferFailuresHigh
+        alertname: MyBankTransferFailuresHigh
         exp_alerts:
           - exp_labels:
               severity: warning
             exp_annotations:
-              summary: Bank transfer failures are high
+              summary: My Bank transfer failures are high
               description: More than three transfer failures occurred during the last ten minutes.
-              runbook_url: README.md#bank-transfer-failures-high
+              runbook_url: README.md#my-bank-transfer-failures-high
       - eval_time: 10m
-        alertname: BankNotificationDeliveryFailed
+        alertname: MyBankNotificationDeliveryFailed
         exp_alerts:
           - exp_labels:
               severity: warning
             exp_annotations:
-              summary: Bank notification delivery failed
+              summary: My Bank notification delivery failed
               description: At least one notification reached the dead letter topic during the last five minutes.
-              runbook_url: README.md#bank-notification-delivery-failed
+              runbook_url: README.md#my-bank-notification-delivery-failed

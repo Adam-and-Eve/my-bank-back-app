@@ -37,4 +37,8 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     && rm kubectl \
     && kubectl version --client
 
+# Bun
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local bash \
+    && bun --version
+
 USER jenkins

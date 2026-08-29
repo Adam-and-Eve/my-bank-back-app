@@ -167,7 +167,6 @@ def executeAllHelmTests(String namespace) {
     }
 }
 
-
 def runUmbrellaPipeline() {
 
     def services = [
@@ -181,7 +180,6 @@ def runUmbrellaPipeline() {
             [name: 'front-ui-service', image: 'my-bank-front-ui-service', hasContractTests: false],
             [name: 'api-gateway', image: 'my-bank-api-gateway', hasContractTests: false]
     ]
-
 
     properties([
             parameters([
@@ -224,22 +222,17 @@ def runUmbrellaPipeline() {
             ])
     ])
 
-
     def imageTag = params.IMAGE_TAG?.trim()
             ? params.IMAGE_TAG.trim()
             : env.BUILD_NUMBER
 
-
     def registryHost = params.IMAGE_REGISTRY.tokenize('/')[0]
 
-
     try {
-
 
         stage('Validate') {
             gradle('projects')
         }
-
 
         stage('Java tests') {
             gradle('test')
@@ -256,11 +249,9 @@ def runUmbrellaPipeline() {
             }
         }
 
-
         stage('bootJar') {
             gradle('clean bootJar')
         }
-
 
         stage('Docker build') {
 
@@ -274,18 +265,15 @@ def runUmbrellaPipeline() {
                                     "${service.name}"
                     )
                 }
-
             } else {
 
                 echo 'Docker builds skipped by parameter.'
             }
         }
 
-
         stage('Image push') {
 
             if (params.PUSH_IMAGES) {
-
 
                 withCredentials([
 
@@ -294,17 +282,14 @@ def runUmbrellaPipeline() {
                                 usernameVariable: 'REGISTRY_USERNAME',
                                 passwordVariable: 'REGISTRY_PASSWORD'
                         )
-
                 ]) {
-
-
                     runCommand(
                             'printf "%s" "$REGISTRY_PASSWORD" | ' +
                                     "docker login ${registryHost} " +
                                     '--username "$REGISTRY_USERNAME" ' +
-                                    '--password-stdin'
+                                    '--password-stdin',
+                            "echo %REGISTRY_PASSWORD%| docker login ${registryHost} --username %REGISTRY_USERNAME% --password-stdin"
                     )
-
 
                     services.each { service ->
 
@@ -314,19 +299,15 @@ def runUmbrellaPipeline() {
                         )
                     }
                 }
-
-
             } else {
 
                 echo 'Image push skipped by parameter.'
             }
         }
 
-
         stage('Kubernetes validation') {
 
             if (params.DEPLOY_TEST || params.DEPLOY_PROD) {
-
 
                 withCredentials([
 
@@ -334,21 +315,19 @@ def runUmbrellaPipeline() {
                                 credentialsId: 'my-bank-kubeconfig',
                                 variable: 'KUBECONFIG'
                         )
-
                 ]) {
 
                     runCommand('kubectl cluster-info')
+
                     runCommand('kubectl get nodes')
+
                     runCommand('helm version')
                 }
-
-
             } else {
 
                 echo 'Kubernetes validation skipped because deployment is disabled.'
             }
         }
-
 
         stage('Prepare test secrets') {
 
@@ -357,17 +336,19 @@ def runUmbrellaPipeline() {
             }
         }
 
-
         stage('Helm lint and template') {
-
 
             def values = serviceValuesArgs(services)
 
+            runCommand('helm dependency update helm/my-bank')
 
-            runCommand(
-                    'helm dependency update helm/my-bank'
-            )
+            runCommand('helm lint helm/charts/zipkin')
 
+            runCommand('helm lint helm/charts/elasticsearch')
+
+            runCommand('helm lint helm/charts/logstash')
+
+            runCommand('helm lint helm/charts/kibana')
 
             runCommand(
                     "helm lint helm/my-bank " +
@@ -377,7 +358,6 @@ def runUmbrellaPipeline() {
                                     ? "-f envs/runtime/values-secrets-test.yaml"
                                     : "")
             )
-
 
             runCommand(
                     "helm template my-bank helm/my-bank " +
@@ -390,18 +370,22 @@ def runUmbrellaPipeline() {
                             " --set global.imageRegistry=${params.IMAGE_REGISTRY}" +
                             " --set global.imageTag=${imageTag}"
             )
+
+            runCommand('bun test scripts/bun/helm/observability-render.test.ts')
+
+            runCommand('promtool test rules helm/charts/spring-service/tests/kafka-publication-alert.test.yaml')
+
+            runCommand(
+                    'docker run --rm --entrypoint=promtool -v "$PWD/helm/my-bank/files/prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/bank-alerts.test.yaml',
+                    'docker run --rm --entrypoint=promtool -v "%CD%\\helm\\my-bank\\files\\prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/bank-alerts.test.yaml'
+            )
         }
-
-
 
         stage('Deploy test') {
 
-
             if (params.DEPLOY_TEST) {
 
-
                 createKeycloakRealmSecret('test')
-
 
                 helmDeploy(
                         services,
@@ -416,10 +400,7 @@ def runUmbrellaPipeline() {
             }
         }
 
-
-
         stage('Manual approval') {
-
 
             if (params.DEPLOY_PROD) {
 
@@ -430,26 +411,18 @@ def runUmbrellaPipeline() {
             }
         }
 
-
-
         stage('Prepare prod secrets') {
-
 
             if (params.DEPLOY_PROD) {
                 decryptSecrets('prod')
             }
         }
 
-
-
         stage('Deploy prod') {
-
 
             if (params.DEPLOY_PROD) {
 
-
                 createKeycloakRealmSecret('prod')
-
 
                 helmDeploy(
                         services,

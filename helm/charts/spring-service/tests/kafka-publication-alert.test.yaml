@@ -6,7 +6,7 @@ evaluation_interval: 1m
 tests:
   - interval: 1m
     input_series:
-      - series: 'bank_kafka_publication_failures_total{application="account-service"}'
+      - series: 'my_bank_kafka_publication_failures_total{application="account-service"}'
         values: '0 1 1 1'
     alert_rule_test:
       - eval_time: 3m

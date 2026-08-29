@@ -146,7 +146,7 @@
     "from": "now-1h",
     "to": "now"
   },
-  "title": "Bank JVM Overview",
-  "uid": "bank-jvm-overview",
+  "title": "My Bank JVM Overview",
+  "uid": "my-bank-jvm-overview",
   "version": 1
 }

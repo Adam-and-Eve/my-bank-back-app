@@ -155,7 +155,7 @@
     "from": "now-1h",
     "to": "now"
   },
-  "title": "Bank HTTP Overview",
-  "uid": "bank-http-overview",
+  "title": "My Bank HTTP Overview",
+  "uid": "my-bank-http-overview",
   "version": 1
 }

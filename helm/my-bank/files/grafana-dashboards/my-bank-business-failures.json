@@ -18,7 +18,7 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(increase(bank_cash_withdrawal_failures_total{namespace=\"$namespace\",application=~\"$application\"}[10m]))",
+          "expr": "sum(increase(my_bank_cash_withdrawal_failures_total{namespace=\"$namespace\",application=~\"$application\"}[10m]))",
           "legendFormat": "withdrawals"
         }
       ],
@@ -39,7 +39,7 @@
       "id": 2,
       "targets": [
         {
-          "expr": "sum(increase(bank_transfer_failures_total{namespace=\"$namespace\",application=~\"$application\"}[10m]))",
+          "expr": "sum(increase(my_bank_transfer_failures_total{namespace=\"$namespace\",application=~\"$application\"}[10m]))",
           "legendFormat": "transfers"
         }
       ],
@@ -60,7 +60,7 @@
       "id": 3,
       "targets": [
         {
-          "expr": "sum(increase(bank_notification_delivery_failures_total{namespace=\"$namespace\",application=~\"$application\"}[5m]))",
+          "expr": "sum(increase(my_bank_notification_delivery_failures_total{namespace=\"$namespace\",application=~\"$application\"}[5m]))",
           "legendFormat": "notifications"
         }
       ],
@@ -80,10 +80,10 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(bank_cash_withdrawal_failures_total, namespace)",
+        "definition": "label_values(my_bank_cash_withdrawal_failures_total, namespace)",
         "name": "namespace",
         "query": {
-          "query": "label_values(bank_cash_withdrawal_failures_total, namespace)",
+          "query": "label_values(my_bank_cash_withdrawal_failures_total, namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "type": "query"
@@ -110,7 +110,7 @@
     "from": "now-1h",
     "to": "now"
   },
-  "title": "Bank Business Failures",
-  "uid": "bank-business-failures",
+  "title": "My Bank Business Failures",
+  "uid": "my-bank-business-failures",
   "version": 1
 }
