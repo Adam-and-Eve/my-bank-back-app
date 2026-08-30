@@ -507,7 +507,7 @@ powershell -ExecutionPolicy Bypass ` -File .\jenkins\scripts\stop-jenkins.ps1
 ### Zipkin (Трассировка)
 
 ```bash
-kubectl port-forward -n test service/zipkin 9411:9411
+kubectl --context kind-test port-forward -n test service/zipkin 9411:9411
 ```
 
 URL: http://localhost:9411
@@ -515,7 +515,7 @@ URL: http://localhost:9411
 ### Grafana (Метрики и Дашборды)
 
 ```bash
-kubectl port-forward -n test service/grafana 3000:80
+kubectl --context kind-test port-forward -n test service/grafana 3000:80
 ```
 
 URL: http://localhost:3000
@@ -523,7 +523,7 @@ URL: http://localhost:3000
 ### Kibana (Логи)
 
 ```bash
-kubectl port-forward -n test service/kibana 5601:5601
+kubectl --context kind-test port-forward -n test service/kibana 5601:5601
 ```
 
 URL: http://localhost:5601
@@ -531,7 +531,7 @@ URL: http://localhost:5601
 ### Prometheus (Алерты и сырые метрики)
 
 ```bash
-kubectl port-forward -n test service/prometheus-operated 9090:9090
+kubectl --context kind-test port-forward -n test service/prometheus-operated 9090:9090
 ```
 
 URL: http://localhost:9090
@@ -595,7 +595,7 @@ kubectl --context kind-test get pods -n test
 ```
 
 ```bash
-kubectl port-forward -n test svc/my-bank-gateway-nginx 8080:80
+kubectl --context kind-test port-forward -n test svc/my-bank-gateway-nginx 8080:80
 ```
 
 http://localhost:8080
