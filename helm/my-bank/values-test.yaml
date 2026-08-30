@@ -40,22 +40,3 @@ keycloak:
 
 monitoring:
   enabled: true
-  grafana:
-    rbac:
-      namespaced: true
-    sidecar:
-      dashboards:
-        searchNamespace: test
-      datasources:
-        searchNamespace: test
-  kube-state-metrics:
-    rbac:
-      useClusterRole: false
-  prometheus:
-    prometheusSpec:
-      ruleSelectorNilUsesHelmValues: false
-      serviceMonitorSelectorNilUsesHelmValues: false
-      podMonitorSelectorNilUsesHelmValues: false
-      podMonitorNamespaceSelector: {}
-      serviceMonitorNamespaceSelector: {}
-      ruleNamespaceSelector: {}

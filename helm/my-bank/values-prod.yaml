@@ -14,13 +14,13 @@ kafka:
   clusterId: Hz5JRp00D1iXfKZoXfO-k
 
 elasticsearch:
-  enabled: false
+  enabled: true
 
 logstash:
-  enabled: false
+  enabled: true
 
 kibana:
-  enabled: false
+  enabled: true
 
 front-ui-service:
   env:
@@ -40,23 +40,4 @@ keycloak:
     frontUiPublicUrl: http://localhost:8080
 
 monitoring:
-  enabled: false
-  grafana:
-    rbac:
-      namespaced: true
-    sidecar:
-      dashboards:
-        searchNamespace: prod
-      datasources:
-        searchNamespace: prod
-  kube-state-metrics:
-    rbac:
-      useClusterRole: false
-  prometheus:
-    prometheusSpec:
-      ruleSelectorNilUsesHelmValues: false
-      serviceMonitorSelectorNilUsesHelmValues: false
-      podMonitorSelectorNilUsesHelmValues: false
-      podMonitorNamespaceSelector: {}
-      serviceMonitorNamespaceSelector: {}
-      ruleNamespaceSelector: {}
+  enabled: true
