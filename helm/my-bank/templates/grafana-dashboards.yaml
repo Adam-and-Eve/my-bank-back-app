@@ -10,4 +10,5 @@ metadata:
 data:
   {{ base $path }}: |
   {{ $.Files.Get $path | indent 4 }}
-  {{- end }}
+---
+{{- end }}
