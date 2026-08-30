@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.transfer.services;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -40,6 +42,7 @@ public class TransferServiceImpl implements TransferService {
     private final ExchangeClient exchangeClient;
     private final NotificationEventPublisher notificationEventPublisher;
     private final Clock clock;
+    private final MeterRegistry meterRegistry;
 
     private static final Logger log = LoggerFactory.getLogger(TransferServiceImpl.class);
 
@@ -52,12 +55,14 @@ public class TransferServiceImpl implements TransferService {
             BlockerClient blockerClient,
             ExchangeClient exchangeClient,
             NotificationEventPublisher notificationEventPublisher,
-            Clock clock) {
+            Clock clock,
+            MeterRegistry meterRegistry) {
         this.transferExecutor = transferExecutor;
         this.blockerClient = blockerClient;
         this.exchangeClient = exchangeClient;
         this.notificationEventPublisher = notificationEventPublisher;
         this.clock = clock;
+        this.meterRegistry = meterRegistry;
     }
 
     // endregion
@@ -82,7 +87,7 @@ public class TransferServiceImpl implements TransferService {
             String senderLogin,
             TransferRequestViewModel request,
             UUID operationId) {
-        validateAmount(request.amount(), operationId, request.currency());
+        validateAmount(request.amount(), operationId, request.currency(), senderLogin, request.recipientLogin());
 
         if (senderLogin.equals(request.recipientLogin())) {
             log.warn(
@@ -90,6 +95,8 @@ public class TransferServiceImpl implements TransferService {
                     operationId,
                     request.currency()
             );
+
+            recordFailure(senderLogin, request.recipientLogin());
 
             throw new SelfTransferForbiddenException();
         }
@@ -135,13 +142,20 @@ public class TransferServiceImpl implements TransferService {
      * @throws InvalidAmountException Если сумма меньше или равна нулю.
      * @throws InvalidAmountScaleException Если количество знаков после запятой больше 2.
      **/
-    private void validateAmount(BigDecimal amount, UUID operationId, CurrencyEnumModel currency) {
+    private void validateAmount(
+            BigDecimal amount,
+            UUID operationId,
+            CurrencyEnumModel currency,
+            String senderLogin,
+            String recipientLogin) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn(
                     "Transfer operation rejected operationId={} operationType=TRANSFER currency={} status=rejected errorCode=INVALID_AMOUNT source=transfer-service",
                     operationId,
                     currency
             );
+
+            recordFailure(senderLogin, recipientLogin);
 
             throw new InvalidAmountException();
         }
@@ -152,6 +166,8 @@ public class TransferServiceImpl implements TransferService {
                     operationId,
                     currency
             );
+
+            recordFailure(senderLogin, recipientLogin);
 
             throw new InvalidAmountScaleException();
         }
@@ -201,6 +217,8 @@ public class TransferServiceImpl implements TransferService {
                     operationId,
                     request.currency()
             );
+
+            recordFailure(senderLogin, request.recipientLogin());
 
             throw new OperationBlockedException(response.reason());
         }
@@ -287,6 +305,15 @@ public class TransferServiceImpl implements TransferService {
                 conversion.targetAmount(),
                 conversion.targetCurrency()
         ));
+    }
+
+    private void recordFailure(String senderLogin, String recipientLogin) {
+        Counter.builder("my.bank.transfer.failures")
+                .tag("application", "transfer-service")
+                .tag("sender_login", senderLogin != null ? senderLogin : "unknown")
+                .tag("recipient_login", recipientLogin != null ? recipientLogin : "unknown")
+                .register(meterRegistry)
+                .increment();
     }
 
     // endregion

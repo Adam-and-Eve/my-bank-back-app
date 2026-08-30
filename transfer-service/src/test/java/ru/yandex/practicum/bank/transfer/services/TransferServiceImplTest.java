@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.transfer.services;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -76,6 +78,8 @@ public class TransferServiceImplTest {
 
     private TransferServiceImpl transferService;
 
+    private MeterRegistry meterRegistry;
+
     // endregion
 
     // region Setup
@@ -83,13 +87,15 @@ public class TransferServiceImplTest {
     @BeforeEach
     public void setUp() {
         clock = Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC"));
+        meterRegistry = new SimpleMeterRegistry();
 
         transferService = new TransferServiceImpl(
                 transferExecutor,
                 blockerClient,
                 exchangeClient,
                 notificationEventPublisher,
-                clock
+                clock,
+                meterRegistry
         );
     }
 
