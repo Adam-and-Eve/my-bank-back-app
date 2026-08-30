@@ -43,7 +43,6 @@ public class CashServiceImpl implements CashService {
     private final NotificationEventPublisher notificationEventPublisher;
     private final AccountBalanceMapper accountBalanceMapper;
     private final Clock clock;
-    private final MeterRegistry meterRegistry;
 
     private static final Logger log =  LoggerFactory.getLogger(CashServiceImpl.class);
 
@@ -67,15 +66,13 @@ public class CashServiceImpl implements CashService {
                            ExchangeClient exchangeClient,
                            NotificationEventPublisher notificationEventPublisher,
                            AccountBalanceMapper accountBalanceMapper,
-                           Clock clock,
-                           MeterRegistry meterRegistry) {
+                           Clock clock) {
         this.accountClient = accountClient;
         this.blockerClient = blockerClient;
         this.exchangeClient = exchangeClient;
         this.notificationEventPublisher = notificationEventPublisher;
         this.accountBalanceMapper = accountBalanceMapper;
         this.clock = clock;
-        this.meterRegistry = meterRegistry;
     }
 
     // endregion
@@ -169,10 +166,6 @@ public class CashServiceImpl implements CashService {
                     currency
             );
 
-            if (operationType == OperationTypeEnumModel.WITHDRAW) {
-                recordWithdrawalFailure(login);
-            }
-
             throw new InvalidAmountException();
         }
         if (amount.scale() > 2) {
@@ -182,10 +175,6 @@ public class CashServiceImpl implements CashService {
                     operationType,
                     currency
             );
-
-            if (operationType == OperationTypeEnumModel.WITHDRAW) {
-                recordWithdrawalFailure(login);
-            }
 
             throw new InvalidAmountScaleException();
         }
@@ -238,10 +227,6 @@ public class CashServiceImpl implements CashService {
                     operationType,
                     request.currency()
             );
-
-            if (operationType == OperationTypeEnumModel.WITHDRAW) {
-                recordWithdrawalFailure(login);
-            }
 
             throw new OperationBlockedException(response.reason());
         }
@@ -303,14 +288,6 @@ public class CashServiceImpl implements CashService {
                 request.amount(),
                 request.currency()
         ));
-    }
-
-    private void recordWithdrawalFailure(String login) {
-        Counter.builder("my.bank.cash.withdrawal.failures")
-                .tag("application", "cash-service")
-                .tag("login", login != null ? login : "unknown")
-                .register(meterRegistry)
-                .increment();
     }
 
     // endregion

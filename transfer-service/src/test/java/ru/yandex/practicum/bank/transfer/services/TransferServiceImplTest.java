@@ -78,8 +78,6 @@ public class TransferServiceImplTest {
 
     private TransferServiceImpl transferService;
 
-    private MeterRegistry meterRegistry;
-
     // endregion
 
     // region Setup
@@ -87,15 +85,13 @@ public class TransferServiceImplTest {
     @BeforeEach
     public void setUp() {
         clock = Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC"));
-        meterRegistry = new SimpleMeterRegistry();
 
         transferService = new TransferServiceImpl(
                 transferExecutor,
                 blockerClient,
                 exchangeClient,
                 notificationEventPublisher,
-                clock,
-                meterRegistry
+                clock
         );
     }
 

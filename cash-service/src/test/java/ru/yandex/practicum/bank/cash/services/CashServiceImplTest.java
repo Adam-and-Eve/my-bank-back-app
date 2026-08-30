@@ -86,8 +86,6 @@ public class CashServiceImplTest {
 
     private CashServiceImpl cashService;
 
-    private MeterRegistry meterRegistry;
-
     // endregion
 
     // region Setup
@@ -96,16 +94,13 @@ public class CashServiceImplTest {
     public void setUp() {
         clock = Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC"));
 
-        meterRegistry = new SimpleMeterRegistry();
-
         cashService = new CashServiceImpl(
                 accountClient,
                 blockerClient,
                 exchangeClient,
                 notificationEventPublisher,
                 accountBalanceMapper,
-                clock,
-                meterRegistry
+                clock
         );
     }
 

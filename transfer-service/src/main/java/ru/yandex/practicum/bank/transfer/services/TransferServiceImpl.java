@@ -42,8 +42,6 @@ public class TransferServiceImpl implements TransferService {
     private final ExchangeClient exchangeClient;
     private final NotificationEventPublisher notificationEventPublisher;
     private final Clock clock;
-    private final MeterRegistry meterRegistry;
-
     private static final Logger log = LoggerFactory.getLogger(TransferServiceImpl.class);
 
     // endregion
@@ -55,14 +53,12 @@ public class TransferServiceImpl implements TransferService {
             BlockerClient blockerClient,
             ExchangeClient exchangeClient,
             NotificationEventPublisher notificationEventPublisher,
-            Clock clock,
-            MeterRegistry meterRegistry) {
+            Clock clock) {
         this.transferExecutor = transferExecutor;
         this.blockerClient = blockerClient;
         this.exchangeClient = exchangeClient;
         this.notificationEventPublisher = notificationEventPublisher;
         this.clock = clock;
-        this.meterRegistry = meterRegistry;
     }
 
     // endregion
@@ -95,8 +91,6 @@ public class TransferServiceImpl implements TransferService {
                     operationId,
                     request.currency()
             );
-
-            recordFailure(senderLogin, request.recipientLogin());
 
             throw new SelfTransferForbiddenException();
         }
@@ -155,8 +149,6 @@ public class TransferServiceImpl implements TransferService {
                     currency
             );
 
-            recordFailure(senderLogin, recipientLogin);
-
             throw new InvalidAmountException();
         }
 
@@ -166,8 +158,6 @@ public class TransferServiceImpl implements TransferService {
                     operationId,
                     currency
             );
-
-            recordFailure(senderLogin, recipientLogin);
 
             throw new InvalidAmountScaleException();
         }
@@ -217,8 +207,6 @@ public class TransferServiceImpl implements TransferService {
                     operationId,
                     request.currency()
             );
-
-            recordFailure(senderLogin, request.recipientLogin());
 
             throw new OperationBlockedException(response.reason());
         }
@@ -305,15 +293,6 @@ public class TransferServiceImpl implements TransferService {
                 conversion.targetAmount(),
                 conversion.targetCurrency()
         ));
-    }
-
-    private void recordFailure(String senderLogin, String recipientLogin) {
-        Counter.builder("my.bank.transfer.failures")
-                .tag("application", "transfer-service")
-                .tag("sender_login", senderLogin != null ? senderLogin : "unknown")
-                .tag("recipient_login", recipientLogin != null ? recipientLogin : "unknown")
-                .register(meterRegistry)
-                .increment();
     }
 
     // endregion

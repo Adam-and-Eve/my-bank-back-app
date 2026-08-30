@@ -31,17 +31,13 @@ public class NotificationServiceImplTest {
 
     private NotificationServiceImpl notificationService;
 
-    private MeterRegistry meterRegistry;
-
     // endregion
 
     // region Setup
 
     @BeforeEach
     public void setUp() {
-        meterRegistry = new SimpleMeterRegistry();
-
-        notificationService = new NotificationServiceImpl(meterRegistry);
+        notificationService = new NotificationServiceImpl();
     }
 
     // endregion

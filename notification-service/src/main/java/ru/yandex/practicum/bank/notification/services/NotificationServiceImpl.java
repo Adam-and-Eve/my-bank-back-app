@@ -20,17 +20,7 @@ public class NotificationServiceImpl implements NotificationService {
 
     // region Fields
 
-    private final MeterRegistry meterRegistry;
-
     private static final Logger log = LoggerFactory.getLogger(NotificationServiceImpl.class);
-
-    // endregion
-
-    // region Constructors
-
-    public NotificationServiceImpl(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-    }
 
     // endregion
 
@@ -44,37 +34,13 @@ public class NotificationServiceImpl implements NotificationService {
      **/
     @Override
     public void notify(NotificationEventModel event) {
-        try {
-            if (event == null || event.recipientLogin() == null) {
-                recordFailure("unknown");
-
-                log.warn("Notification rejected due to invalid payload");
-
-                return;
-            }
-
-            log.info(
-                    "Notification accepted: eventId={}, operationId={}, source={}, type={}",
-                    event.eventId(),
-                    event.operationId(),
-                    event.source(),
-                    event.type()
-            );
-        } catch (Exception ex) {
-            recordFailure(event != null ? event.recipientLogin() : "unknown");
-
-            log.error("Notification processing failed: eventId={}", event != null ? event.eventId() : null, ex);
-
-            throw ex;
-        }
-    }
-
-    private void recordFailure(String recipientLogin) {
-        Counter.builder("my.bank.notification.delivery.failures")
-                .tag("application", "notification-service")
-                .tag("recipient_login", recipientLogin)
-                .register(meterRegistry)
-                .increment();
+        log.info(
+                "Notification accepted: eventId={}, operationId={}, source={}, type={}",
+                event.eventId(),
+                event.operationId(),
+                event.source(),
+                event.type()
+        );
     }
 
     // endregion
