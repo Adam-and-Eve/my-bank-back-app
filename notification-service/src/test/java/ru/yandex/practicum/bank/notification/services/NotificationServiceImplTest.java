@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.notification.services;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,13 +31,17 @@ public class NotificationServiceImplTest {
 
     private NotificationServiceImpl notificationService;
 
+    private MeterRegistry meterRegistry;
+
     // endregion
 
     // region Setup
 
     @BeforeEach
     public void setUp() {
-        notificationService = new NotificationServiceImpl();
+        meterRegistry = new SimpleMeterRegistry();
+
+        notificationService = new NotificationServiceImpl(meterRegistry);
     }
 
     // endregion
