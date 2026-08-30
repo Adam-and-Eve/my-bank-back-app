@@ -40,3 +40,7 @@ keycloak:
 
 monitoring:
   enabled: true
+  grafana:
+    sidecar:
+      dashboards:
+        searchNamespace: "test"
