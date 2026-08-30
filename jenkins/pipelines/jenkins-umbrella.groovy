@@ -44,7 +44,7 @@ def cleanupRuntimeSecrets() {
 
 def createKeycloakRealmSecret(String namespace) {
     withCredentials([
-            file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')
+            file(credentialsId: "my-bank-kubeconfig-${namespace}", variable: 'KUBECONFIG')
     ]) {
         runCommand("kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -")
         runCommand("kubectl create secret generic keycloak-realm --from-file=my-bank-realm-realm.json=envs/runtime/my-bank-realm-realm.json --namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -")
@@ -60,12 +60,12 @@ def helmDeploy(
         String imageTag
 ) {
     withCredentials([
-            file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')
+            file(credentialsId: "my-bank-kubeconfig-${namespace}", variable: 'KUBECONFIG')
     ]) {
         def values = serviceValuesArgs(services)
         def command = "helm upgrade --install my-bank helm/my-bank --namespace ${namespace} --create-namespace --atomic --wait --wait-for-jobs --timeout 30m -f ${valuesFile} ${values} -f ${secretsFile} --set global.bankImageRegistry=${imageRegistry} --set global.bankImageTag=${imageTag}"
 
-        echo "🚀 Выполняем боевой Helm Deploy..."
+        echo "🚀 Выполняем боевой Helm Deploy в ${namespace}..."
         runCommand(command)
     }
 }
@@ -96,7 +96,7 @@ def runHelmTest(String namespace, String testName, String stageName) {
 
 def executeAllHelmTests(String namespace) {
     withCredentials([
-            file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')
+            file(credentialsId: "my-bank-kubeconfig-${namespace}", variable: 'KUBECONFIG')
     ]) {
         runHelmTest(namespace, 'my-bank-smoke-test', '✅ Test: Smoke')
         runHelmTest(namespace, 'my-bank-kafka-broker-test', '✅ Test: Kafka Broker')
@@ -143,12 +143,12 @@ def runUmbrellaPipeline() {
                     booleanParam(
                             name: 'DEPLOY_TEST',
                             defaultValue: false,
-                            description: 'Deploy umbrella chart to test namespace'
+                            description: 'Deploy umbrella chart to test namespace/cluster'
                     ),
                     booleanParam(
                             name: 'DEPLOY_PROD',
                             defaultValue: false,
-                            description: 'Deploy umbrella chart to prod namespace after manual approval'
+                            description: 'Deploy umbrella chart to prod namespace/cluster after manual approval'
                     )
             ])
     ])
@@ -224,15 +224,25 @@ def runUmbrellaPipeline() {
         }
 
         stage('☸️ K8s: Validation') {
-            if (params.DEPLOY_TEST || params.DEPLOY_PROD) {
+            if (params.DEPLOY_TEST) {
                 withCredentials([
-                        file(credentialsId: 'my-bank-kubeconfig', variable: 'KUBECONFIG')
+                        file(credentialsId: 'my-bank-kubeconfig-test', variable: 'KUBECONFIG')
                 ]) {
+                    echo '--- Проверка кластера TEST ---'
                     runCommand('kubectl cluster-info')
                     runCommand('kubectl get nodes')
-                    runCommand('helm version')
                 }
-            } else {
+            }
+            if (params.DEPLOY_PROD) {
+                withCredentials([
+                        file(credentialsId: 'my-bank-kubeconfig-prod', variable: 'KUBECONFIG')
+                ]) {
+                    echo '--- Проверка кластера PROD ---'
+                    runCommand('kubectl cluster-info')
+                    runCommand('kubectl get nodes')
+                }
+            }
+            if (!params.DEPLOY_TEST && !params.DEPLOY_PROD) {
                 echo 'Пропуск: деплой отключен.'
             }
         }

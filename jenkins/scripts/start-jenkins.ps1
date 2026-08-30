@@ -6,26 +6,6 @@ $JenkinsDir = Resolve-Path (Join-Path $ScriptDir "..")
 $JenkinsImage = "my-bank-jenkins:1.0"
 $Network = "jenkins"
 $KindNetwork = "kind"
-$Kubeconfig = Join-Path $ScriptDir "jenkins-kubeconfig.yaml"
-
-Write-Host "Creating Jenkins kubeconfig..."
-
-kind get kubeconfig --name kind |
-    ForEach-Object {
-        $_ -replace 'server: https://[^:]+:\d+', `
-             'server: https://kind-control-plane:6443'
-    } |
-    Set-Content -Path $Kubeconfig
-
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to create Jenkins kubeconfig."
-}
-
-if (-not (Test-Path $Kubeconfig)) {
-    throw "Jenkins kubeconfig was not created: $Kubeconfig"
-}
-
-Write-Host "Jenkins kubeconfig created: $Kubeconfig"
 
 Write-Host "Creating Docker network..."
 
@@ -107,7 +87,6 @@ docker run `
     --env DOCKER_TLS_VERIFY=1 `
     --volume jenkins-data:/var/jenkins_home `
     --volume jenkins-docker-certs:/certs/client:ro `
-    --volume "${Kubeconfig}:/var/jenkins_home/.kube/config:ro" `
     --publish 8090:8080 `
     --publish 50000:50000 `
     $JenkinsImage
@@ -122,14 +101,6 @@ docker network connect $KindNetwork my-bank-jenkins
 
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to connect Jenkins to Kind network '$KindNetwork'."
-}
-
-Write-Host "Removing temporary Jenkins kubeconfig..."
-
-Remove-Item -Path $Kubeconfig -Force
-
-if (Test-Path $Kubeconfig) {
-    throw "Failed to remove temporary Jenkins kubeconfig."
 }
 
 Write-Host ""

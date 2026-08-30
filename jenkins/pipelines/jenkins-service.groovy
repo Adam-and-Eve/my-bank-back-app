@@ -57,7 +57,7 @@ def deployService(
 ) {
     withCredentials([
             file(
-                    credentialsId: 'my-bank-kubeconfig',
+                    credentialsId: "my-bank-kubeconfig-${namespace}", // <--- Динамическое переключение кластеров
                     variable: 'KUBECONFIG'
             )
     ]) {
@@ -113,12 +113,12 @@ def runServicePipeline(Map service) {
                     booleanParam(
                             name: 'DEPLOY_TEST',
                             defaultValue: false,
-                            description: 'Deploy chart to test namespace'
+                            description: 'Deploy chart to test namespace/cluster'
                     ),
                     booleanParam(
                             name: 'DEPLOY_PROD',
                             defaultValue: false,
-                            description: 'Deploy chart to prod namespace after manual approval'
+                            description: 'Deploy chart to prod namespace/cluster after manual approval'
                     )
             ])
     ])
