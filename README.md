@@ -438,7 +438,7 @@ docker.io/<docker-login>
 
 #### 11. Проверить развертывание:
 
-###### Проверить состояние ресурсов в тестовом кластере:
+##### Проверить состояние ресурсов в тестовом кластере:
 
 ```bash
 kubectl --context kind-test get all,ingress,httproute --namespace test
@@ -450,7 +450,7 @@ kubectl --context kind-test port-forward -n test svc/my-bank-gateway-nginx 8080:
 
 URL: http://localhost:8080
 
-###### Проверить состояние ресурсов в production-кластере:
+##### Проверить состояние ресурсов в production-кластере:
 
 ```bash
 kubectl --context kind-prod get all,ingress,httproute --namespace prod
@@ -462,7 +462,7 @@ kubectl --context kind-prod port-forward -n prod svc/my-bank-gateway-nginx 8080:
 
 URL: http://localhost:8080
 
-###### Проверить состояние ресурсов в production-кластере:
+##### Проверить состояние ресурсов в production-кластере:
 
 ```bash
 kubectl --context kind-prod get all,ingress,httproute --namespace prod
@@ -470,19 +470,19 @@ kubectl --context kind-prod get all,ingress,httproute --namespace prod
 
 #### 12. Удалить и очистить:
 
-###### Удалить приложение из тестового кластера:
+##### Удалить приложение из тестового кластера:
 
 ```bash
 helm uninstall my-bank --kube-context kind-test --namespace test kubectl --context kind-test delete namespace test
 ```
 
-###### Удалить приложение из production-кластера:
+##### Удалить приложение из production-кластера:
 
 ```bash
 helm uninstall my-bank --kube-context kind-prod --namespace prod kubectl --context kind-prod delete namespace prod
 ```
 
-###### Удалить кластеры:
+##### Удалить кластеры:
 
 ```bash
 kind delete cluster --name test
@@ -492,7 +492,7 @@ kind delete cluster --name test
 kind delete cluster --name prod
 ```
 
-- ##### Остановить Jenkins:
+##### Остановить Jenkins:
 
 ```bash
 powershell -ExecutionPolicy Bypass ` -File .\jenkins\scripts\stop-jenkins.ps1
