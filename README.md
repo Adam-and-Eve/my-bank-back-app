@@ -413,7 +413,7 @@ https://github.com/Adam-and-Eve/my-bank-back-app.git
 #### 4. Выбрать в `Branch Specifier (blank for 'any')`:
 
 ```bash
-*/module_three_sprint_eleven_branch
+*/module_three_sprint_twelve_branch
 ```
 
 #### 5. Сохранить изменения
