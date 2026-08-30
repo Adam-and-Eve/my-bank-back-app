@@ -1,5 +1,4 @@
 {{- range $path, $_ := .Files.Glob "files/grafana-dashboards/*.json" }}
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
