@@ -65,7 +65,12 @@ public class CashSecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/actuator/prometheus"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/cash/deposit")
                         .access(allOf(hasRole("USER"), hasRole("CASH_WRITE")))
                         .requestMatchers(HttpMethod.POST, "/api/cash/withdraw")
