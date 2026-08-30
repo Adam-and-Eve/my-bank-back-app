@@ -473,13 +473,13 @@ kubectl --context kind-prod get all,ingress,httproute --namespace prod
 ##### Удалить приложение из тестового кластера:
 
 ```bash
-helm uninstall my-bank --kube-context kind-test --namespace test kubectl --context kind-test delete namespace test
+helm uninstall my-bank --kube-context kind-test --namespace test
 ```
 
 ##### Удалить приложение из production-кластера:
 
 ```bash
-helm uninstall my-bank --kube-context kind-prod --namespace prod kubectl --context kind-prod delete namespace prod
+helm uninstall my-bank --kube-context kind-prod --namespace prod
 ```
 
 ##### Удалить кластеры:
