@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.cash.services;
 
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,6 +86,8 @@ public class CashServiceImplTest {
 
     private CashServiceImpl cashService;
 
+    private MeterRegistry meterRegistry;
+
     // endregion
 
     // region Setup
@@ -92,13 +96,16 @@ public class CashServiceImplTest {
     public void setUp() {
         clock = Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC"));
 
+        meterRegistry = new SimpleMeterRegistry();
+
         cashService = new CashServiceImpl(
                 accountClient,
                 blockerClient,
                 exchangeClient,
                 notificationEventPublisher,
                 accountBalanceMapper,
-                clock
+                clock,
+                meterRegistry
         );
     }
 

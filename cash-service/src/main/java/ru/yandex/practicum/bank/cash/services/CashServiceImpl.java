@@ -1,5 +1,7 @@
 package ru.yandex.practicum.bank.cash.services;
 
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,7 @@ public class CashServiceImpl implements CashService {
     private final NotificationEventPublisher notificationEventPublisher;
     private final AccountBalanceMapper accountBalanceMapper;
     private final Clock clock;
+    private final MeterRegistry meterRegistry;
 
     private static final Logger log =  LoggerFactory.getLogger(CashServiceImpl.class);
 
@@ -64,13 +67,15 @@ public class CashServiceImpl implements CashService {
                            ExchangeClient exchangeClient,
                            NotificationEventPublisher notificationEventPublisher,
                            AccountBalanceMapper accountBalanceMapper,
-                           Clock clock) {
+                           Clock clock,
+                           MeterRegistry meterRegistry) {
         this.accountClient = accountClient;
         this.blockerClient = blockerClient;
         this.exchangeClient = exchangeClient;
         this.notificationEventPublisher = notificationEventPublisher;
         this.accountBalanceMapper = accountBalanceMapper;
         this.clock = clock;
+        this.meterRegistry = meterRegistry;
     }
 
     // endregion
@@ -92,7 +97,7 @@ public class CashServiceImpl implements CashService {
             String login,
             CashOperationRequestViewModel request,
             UUID operationId) {
-        validateAmount(request.amount(), operationId, OperationTypeEnumModel.DEPOSIT, request.currency());
+        validateAmount(request.amount(), operationId, OperationTypeEnumModel.DEPOSIT, request.currency(), login);
 
         checkOperation(login, request, operationId, OperationTypeEnumModel.DEPOSIT);
 
@@ -124,7 +129,7 @@ public class CashServiceImpl implements CashService {
             String login,
             CashOperationRequestViewModel request,
             UUID operationId) {
-        validateAmount(request.amount(), operationId, OperationTypeEnumModel.WITHDRAW, request.currency());
+        validateAmount(request.amount(), operationId, OperationTypeEnumModel.WITHDRAW, request.currency(), login);
 
         checkOperation(login, request, operationId, OperationTypeEnumModel.WITHDRAW);
 
@@ -154,7 +159,8 @@ public class CashServiceImpl implements CashService {
     private void validateAmount(BigDecimal amount,
                                 UUID operationId,
                                 OperationTypeEnumModel operationType,
-                                CurrencyEnumModel currency) {
+                                CurrencyEnumModel currency,
+                                String login) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn(
                     "Cash operation rejected operationId={} operationType={} currency={} status=rejected errorCode=INVALID_AMOUNT source=cash-service",
@@ -162,6 +168,10 @@ public class CashServiceImpl implements CashService {
                     operationType,
                     currency
             );
+
+            if (operationType == OperationTypeEnumModel.WITHDRAW) {
+                recordWithdrawalFailure(login);
+            }
 
             throw new InvalidAmountException();
         }
@@ -172,6 +182,10 @@ public class CashServiceImpl implements CashService {
                     operationType,
                     currency
             );
+
+            if (operationType == OperationTypeEnumModel.WITHDRAW) {
+                recordWithdrawalFailure(login);
+            }
 
             throw new InvalidAmountScaleException();
         }
@@ -224,6 +238,10 @@ public class CashServiceImpl implements CashService {
                     operationType,
                     request.currency()
             );
+
+            if (operationType == OperationTypeEnumModel.WITHDRAW) {
+                recordWithdrawalFailure(login);
+            }
 
             throw new OperationBlockedException(response.reason());
         }
@@ -285,6 +303,14 @@ public class CashServiceImpl implements CashService {
                 request.amount(),
                 request.currency()
         ));
+    }
+
+    private void recordWithdrawalFailure(String login) {
+        Counter.builder("my.bank.cash.withdrawal.failures")
+                .tag("application", "cash-service")
+                .tag("login", login != null ? login : "unknown")
+                .register(meterRegistry)
+                .increment();
     }
 
     // endregion
