@@ -9,6 +9,6 @@ metadata:
     {{- include "my-bank.labels" $ | nindent 4 }}
 data:
   {{ base $path }}: |
-  {{ $.Files.Get $path | indent 4 }}
+  {{ $.Files.Get $path | nindent 4 }}
 ---
 {{- end }}
