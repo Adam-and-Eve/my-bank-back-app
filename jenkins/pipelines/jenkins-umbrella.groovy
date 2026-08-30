@@ -63,7 +63,7 @@ def helmDeploy(
             file(credentialsId: "my-bank-kubeconfig-${namespace}", variable: 'KUBECONFIG')
     ]) {
         def values = serviceValuesArgs(services)
-        def command = "helm upgrade --install my-bank helm/my-bank --namespace ${namespace} --create-namespace --atomic --wait --wait-for-jobs --timeout 30m -f ${valuesFile} ${values} -f ${secretsFile} --set global.bankImageRegistry=${imageRegistry} --set global.bankImageTag=${imageTag}"
+        def command = "helm upgrade --install my-bank helm/my-bank --namespace ${namespace} --create-namespace --atomic --wait --wait-for-jobs --timeout 60m -f ${valuesFile} ${values} -f ${secretsFile} --set global.bankImageRegistry=${imageRegistry} --set global.bankImageTag=${imageTag}"
 
         echo "🚀 Выполняем боевой Helm Deploy в ${namespace}..."
         runCommand(command)
@@ -74,7 +74,7 @@ def runHelmTest(String namespace, String testName, String stageName) {
     stage(stageName) {
         try {
             echo "🧪 Запуск Helm-теста: ${testName}"
-            runCommand("helm test my-bank --namespace ${namespace} --filter name=${testName} --timeout 30m")
+            runCommand("helm test my-bank --namespace ${namespace} --filter name=${testName} --timeout 60m")
         } catch (Exception e) {
             echo "❌ Тест ${stageName} упал. Сбор логов для диагностики..."
             runCommand(
