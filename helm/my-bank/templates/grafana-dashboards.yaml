@@ -6,6 +6,7 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     grafana_dashboard: "1"
+    release: {{ $.Release.Name }}
     {{- include "my-bank.labels" $ | nindent 4 }}
 data:
   {{ base $path }}: |-
