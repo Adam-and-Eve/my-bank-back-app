@@ -1,19 +1,21 @@
 # my-bank-back-app
 
-Мультимодульное микросервисное приложение «Банк» с веб-интерфейсом, OAuth2/OIDC-аутентификацией через Keycloak, асинхронным взаимодействием через Apache Kafka и Kubernetes-развёртыванием.
+Мультимодульное микросервисное приложение «Банк» с веб-интерфейсом, OAuth2/OIDC-аутентификацией через Keycloak, асинхронным взаимодействием через Apache Kafka, Kubernetes-развёртыванием и полноценным стеком Observability (Zipkin, Prometheus, Grafana, ELK).
 
 ---
 
 ## 🚀 О проекте
 
 Проект реализует полный цикл CI/CD:
-- сборка Java-приложения;
-- запуск автоматических тестов;
-- сборка Docker-образов;
+- сборка Java-приложения и Docker-образов;
+- запуск автоматических тестов (Unit, Contract, Infrastructure);
 - публикация Docker-образов;
-- развёртывание приложения в Kubernetes через Helm;
+- развёртывание приложения в два изолированных Kubernetes-кластера (Test и Prod) через Helm;
 - управление секретами через SOPS;
-- автоматизация доставки через Jenkins Pipeline.
+- автоматизация доставки через Jenkins Pipeline;
+- распределённая трассировка запросов (Zipkin);
+- сбор, хранение и визуализация метрик (Prometheus + Grafana);
+- централизованное логирование бизнес-операций (ELK Stack).
 
 Приложение позволяет пользователю:
 
@@ -34,58 +36,45 @@
 | `cash-service`               | Пополнение / снятие средств       | 8082 |
 | `transfer-service`           | Переводы между счетами            | 8083 |
 | `notification-service`       | Уведомления о операциях           | 8084 |
-| `exchange-service`           | Курсы валют                       | 8886 |
+| `exchange-service`           | Курсы валют                       | 8086 |
 | `exchange-generator-service` | Генерация курсов валют            | 8087 |
 | `blocker-service`            | Проверка подозрительных операций  | 8088 |
 | `shared`                     | Общие компоненты                  | —    |
 
 Инфраструктурные компоненты:
 
-| Компонент              | Назначение                                |
-|------------------------|-------------------------------------------|
-| `PostgreSQL `          | Хранилище данных                          |
-| `Keycloak`             | OAuth2/OIDC сервер авторизации            |
-| `Apache Kafka`         | Брокер сообщений для асинхронного общения |
-| `NGINX Gateway Fabric` | Реализация Kubernetes Gateway API         |
-| `Jenkins`              | CI/CD система                             |
+| Компонент                               | Назначение                                     |
+|-----------------------------------------|------------------------------------------------|
+| `PostgreSQL `                           | Хранилище данных                               |
+| `Keycloak`                              | OAuth2/OIDC сервер авторизации                 |
+| `Apache Kafka`                          | Брокер сообщений для асинхронного общения      |
+| `NGINX Gateway Fabric`                  | Реализация Kubernetes Gateway API              |
+| `Zipkin`                                | Система распределённых трассировок             |
+| `Prometheus + Grafana`                  | Сбор метрик, алертинг и визуализация дашбордов |
+| `Elasticsearch, Logstash, Kibana (ELK)` | Централизованное логирование                   |
+| `Jenkins`                               | CI/CD система                                  |
 
 ---
 
 ## 🛠 Технологический стек
 
-## Backend
+### Backend
 
-- Java 21
-- Spring Boot 3.5.15
-- Spring Security OAuth2 Resource Server
-- Spring Security OAuth2 Client
-- Spring Kafka
-- Spring Data JPA
-- PostgreSQL
-- Flyway
-- JUnit 5
-- Mockito
+- Java 21, Spring Boot 3.5.15
+- Spring Security OAuth2 (Resource Server & Client)
+- Spring Kafka, Spring Data JPA, PostgreSQL, Flyway
+- JUnit 5, Mockito
+- Observability: Micrometer, Micrometer Tracing (Brave), Slf4j + Log4j2/Logback
 
-## Kubernetes
+### Kubernetes & CI/CD
 
-- Kubernetes
-- Kind
-- Helm 3
-- Gateway API
+- Kubernetes (Kind), Helm, Gateway API
 - NGINX Gateway Fabric
-- Apache Kafka (KRaft mode)
-
-## CI/CD
-
-- Jenkins Pipeline
-- Docker
-- Docker Registry
-- SOPS
-- age
+- Jenkins Pipeline, Docker, Docker Registry, SOPS, age
 
 ---
 
-# 📨 Асинхронное взаимодействие (Apache Kafka)
+## 📨 Асинхронное взаимодействие (Apache Kafka)
 
 Kafka выступает в роли асинхронной шины данных, разделяя основные банковские сервисы и сервис уведомлений. Сервис `notification-service` работает исключительно как консьюмер событий.
 
@@ -107,111 +96,58 @@ Kafka выступает в роли асинхронной шины данны�
 
 ---
 
-# ☸ Kubernetes архитектура
+## 🔭 Observability (Мониторинг, логирование, трейсинг)
 
-## Cluster
+### Распределённая трассировка (Zipkin)
+- Все микросервисы и Front UI поставляют трейсы HTTP-запросов, обращений к БД и Apache Kafka через Micrometer Tracing.
+- Проброс контекста (`traceId`, `spanId`, `parentSpanId`) осуществляется через стандартные HTTP-заголовки. Front UI выступает инициатором генерации первичного `traceId`.
 
-Локальный Kubernetes-кластер создаётся с помощью Kind.
+### Метрики и Алерты (Prometheus + Grafana)
+- Сбор базовых JVM и HTTP метрик (RPS, 4xx, 5xx, персентили) реализован через Spring Boot Actuator.
+- Внедрены кастомные бизнес-метрики:
+  - Неуспешные попытки снятия и перевода средств (с группировкой по логинам).
+  - Неуспешные доставки уведомлений (с группировкой по логину).
+- В Grafana преднастроены дашборды: Bank HTTP Overview, Bank JVM Overview, Bank Business Failures. Настроены алерты по пороговым значениям (Prometheus).
 
-```bash
-powershell -ExecutionPolicy Bypass -File .\kubernetes\scripts\kind-bootstrap.ps1
-```
+### Централизованное логирование (ELK Stack)
+- Логи передаются в едином формате (JSON/структурированный текст) через Slf4j.
+- Интеграция с Zipkin: каждый лог содержит traceId и spanId для сквозного поиска в Kibana.
+- Logstash выполняет роль агрегатора и фильтра, Elasticsearch хранит индексы, Kibana обеспечивает визуализацию через Data View bank-logs.
 
-Скрипт выполняет:
-
-- создание Kind cluster;
-- установку Gateway API CRD;
-- установку NGINX Gateway Fabric.
-
----
-
-# 📦 Helm структура
-
-Проект использует зонтичный Helm chart:
-
-```bash
-├── charts/
-│   ├── keycloak
-│   ├── postgresql
-│   ├── kafka
-│   └── spring-service
-├── my-bank
-│
-└── values
-      └── services
-              ├── account-service.yaml
-              └── ...
-```
-
-## Umbrella chart
-
-Главный chart `helm/my-bank` содержит:
-- все Spring Boot сервисы как subcharts;
-- PostgreSQL StatefulSet;
-- Keycloak deployment;
-- Kafka StatefulSet;
-- Gateway API ресурсы.
-
-Каждый сервис может быть развернут отдельно или вместе через umbrella chart.
+### Учебные ограничения среды
+- Zipkin хранит трейсы in-memory.
+- Elasticsearch развернут в режиме single-node без security-плагинов.
+- Prometheus имеет retention 24 часа. Конфигурация инфраструктуры адаптирована для локальной разработки и тестов, а не для Highload Production.
 
 ---
 
-# 🔐 Управление секретами
+## 🚨 Runbook алертов
 
-Секреты хранятся в зашифрованном виде с использованием SOPS и age.
-Расшифровка выполняется только внутри Jenkins Pipeline.
+При срабатывании алертов в Prometheus/Grafana используйте следующие инструкции для диагностики:
 
-```bash
-envs/secrets/
-│
-├── values-secrets-dev.enc.yaml
-├── values-secrets-test.enc.yaml
-├── values-secrets-prod.enc.yaml
-└── my-bank-realm-realm.enc.json
-```
+- `Bank HTTP 5xx ratio high`
 
-### Создание и шифрование секретов
+  Проверить приложение из label `application`, последние HTTP 5xx и связанные логи/трейсы. Сопоставить рост ошибок с недоступностью зависимостей (БД, Kafka, соседние сервисы).
+- `Bank HTTP p95 latency high`
 
-Для создания зашифрованных файлов используйте следующие команды:
+  Проверить медленные URI, загрузку JVM (GC pauses, memory) и внешние HTTP/JDBC-вызовы приложения через Zipkin.
+- `Bank withdrawal failures high`
 
-```bash
-cmd /c "sops --encrypt ./helm/my-bank/secrets/values-secrets-dev.yaml > ./envs/secrets/values-secrets-dev.enc.yaml"
-```
+  Проверить причины отказов снятия (недостаточно средств, блокировки) и исключить массовые невалидные запросы (потенциальный фрод).
 
-```bash
-cmd /c "sops --encrypt ./helm/my-bank/secrets/values-secrets-test.yaml > ./envs/secrets/values-secrets-test.enc.yaml"
-```
+- `Bank transfer failures high`
 
-```bash
-cmd /c "sops --encrypt ./helm/my-bank/secrets/values-secrets-prod.yaml > ./envs/secrets/values-secrets-prod.enc.yaml"
-```
+  Проверить причины отказов переводов и доступность смежных сервисов: `account-service`, `exchange-service` и `blocker-service`.
 
-```bash
-cmd /c "sops --encrypt ./keycloak/realms/my-bank-realm-realm.json > ./envs/secrets/my-bank-realm-realm.enc.json"
-```
+- `Bank notification delivery failed`
 
-Пример исходного (незашифрованного) файла секрета `values-secrets.yaml`:
-
-```bash
-serviceCredentials:
-  BANK_SERVICES_FRONT_UI_SERVICE_CLIENT_SECRET:
-  BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET:
-  BANK_SERVICES_CASH_SERVICE_CLIENT_SECRET:
-  BANK_SERVICES_TRANSFER_SERVICE_CLIENT_SECRET:
-  BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET:
-  BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET:
-
-postgresqlCredentials:
-  password:
-
-keycloakCredentials:
-  adminUsername:
-  adminPassword:
-```
+  Проверить топик DLT, consumer lag в Kafka и ошибку окончательной обработки в `notification-service`.
 
 ---
 
-## ⚙️ Переменные окружения
+## 🐳 Локальный запуск через Docker Compose
+
+### Переменные окружения
 
 Заполните файл .env.my-bank в корне проекта перед локальным запуском:
 
@@ -277,9 +213,7 @@ BANK_SERVICES_EXCHANGE_GENERATOR_SERVICES_FIXED_DELAY_MS="1000"
 JENKINS_ADMIN_PASSWORD=__JENKINS_ADMIN_PASSWORD__
 ```
 
----
-
-## Тестовые пользователи Keycloak
+### Тестовые пользователи Keycloak
 
 | Логин     | Пароль    | Роли                                                            |
 |-----------|-----------|-----------------------------------------------------------------|
@@ -287,42 +221,39 @@ JENKINS_ADMIN_PASSWORD=__JENKINS_ADMIN_PASSWORD__
 | `alexey`  | `alexey`  | `USER, ACCOUNT_READ, ACCOUNT_WRITE, CASH_WRITE, TRANSFER_WRITE` |
 | `elena`   | `elena`   | `USER, ACCOUNT_READ, ACCOUNT_WRITE, CASH_WRITE, TRANSFER_WRITE` |
 
+### Запуск среды
 
----
-
-## 🐳 Локальный запуск через Docker Compose
-
-### 1. Сборка всех сервисов
+#### 1. Сборка всех сервисов
 
 ```bash
 ./gradlew clean bootJar
 ```
 
-### 2. Запуск полной инфраструктуры + всех сервисов
+#### 2. Запуск полной инфраструктуры + всех сервисов
 
 ```bash
 docker compose --profile app --env-file .env.my-bank up --build -d
 ```
 
-### 3. Проверка статуса
+#### 3. Проверка статуса
 
 ```bash
 docker compose --profile app ps
 ```
 
-### 4. Просмотр логов
+#### 4. Просмотр логов
 
 ```bash
 docker compose --profile app logs -f
 ```
 
-### 5. Остановка
+#### 5. Остановка
 
 ```bash
 docker compose --profile app down
 ```
 
-### 6. Сброс локальных данных
+#### 6. Сброс локальных данных
 
 ```bash
 docker compose down --volumes
@@ -330,178 +261,298 @@ docker compose down --volumes
 
 ---
 
-# 🔄 Jenkins CI/CD
+## ☸ Подготовка Kubernetes
 
-Jenkins используется для:
+Для строгой изоляции инфраструктуры локальная среда разделена на два независимых кластера Kind: `Test` и `Prod`. Скрипт автоматически устанавливает Gateway API CRD и NGINX Gateway Fabric в целевой кластер.
 
-- проверки проекта;
-- запуска тестов;
-- сборки Docker images;
-- публикации images;
-- Helm deployment.
-
-Jenkins запускается отдельным скриптом:
+#### Создание тестового контура:
 
 ```bash
-powershell -ExecutionPolicy Bypass `
--File .\jenkins\scripts\start-jenkins.ps1
+powershell -ExecutionPolicy Bypass -File .\kubernetes\scripts\kind-bootstrap.ps1 -ClusterName test
 ```
 
-После запуска:
-http://localhost:8090
+#### Создание продуктового контура:
+
+```bash
+powershell -ExecutionPolicy Bypass -File .\kubernetes\scripts\kind-bootstrap.ps1 -ClusterName prod
+```
+
+Переключение между кластерами локально: `kubectl config use-context kind-test` или `kubectl config use-context kind-prod`.
 
 ---
 
-# Jenkins Credentials
+## 📦 Helm структура
 
-Необходимо создать следующие Credentials:
-
-### my-bank-sops-age-key
-- тип: `Secret file`
-- описание: Файл с публичным и приватным ключом age для SOPS
-
-### my-bank-kubeconfig
-- тип: `Secret file`
-- описание: Kubernetes kubeconfig (cоздаётся с помощью скрипта)
+Проект использует зонтичный Helm chart (`my-bank`), объединяющий микросервисы и инфраструктуру:
 
 ```bash
-powershell -ExecutionPolicy Bypass `
--File .\kubernetes\scripts\create-jenkins-kubeconfig.ps1
+├── charts/
+│   ├── keycloak
+│   ├── postgresql
+│   ├── kafka
+│   ├── kibana
+│   ├── logstash
+│   ├── spring-service
+│   └── zipkin
+├── my-bank/
+├── values/
+│      └── services/
+│             ├── account-service.yaml
+│             └── ...
+└── scripts/
 ```
 
-### my-bank-registry-credentials
+---
+
+## 🔐 Управление секретами и SOPS
+
+Секреты зашифрованы с использованием SOPS и age. Расшифровка выполняется строго внутри пайплайна.
+
+```bash
+envs/secrets/
+│
+├── values-secrets-dev.enc.yaml
+├── values-secrets-test.enc.yaml
+├── values-secrets-prod.enc.yaml
+└── my-bank-realm-realm.enc.json
+```
+
+### Создание и шифрование секретов (SOPS)
+
+```bash
+cmd /c "sops --encrypt ./helm/my-bank/secrets/values-secrets-test.yaml > ./envs/secrets/values-secrets-test.enc.yaml"
+```
+
+```bash
+cmd /c "sops --encrypt ./helm/my-bank/secrets/values-secrets-prod.yaml > ./envs/secrets/values-secrets-prod.enc.yaml"
+```
+
+```bash
+cmd /c "sops --encrypt ./keycloak/realms/my-bank-realm-realm.json > ./envs/secrets/my-bank-realm-realm.enc.json"
+```
+
+Пример исходного (незашифрованного) файла секрета `values-secrets.yaml`:
+
+```bash
+serviceCredentials:
+  BANK_SERVICES_FRONT_UI_SERVICE_CLIENT_SECRET: "__FRONT_UI_SERVICE_CLIENT_SECRET__"
+  BANK_SERVICES_ACCOUNT_SERVICE_CLIENT_SECRET: "__ACCOUNT_SERVICE_CLIENT_SECRET__"
+  BANK_SERVICES_CASH_SERVICE_CLIENT_SECRET: "__CASH_SERVICE_CLIENT_SECRET__"
+  BANK_SERVICES_TRANSFER_SERVICE_CLIENT_SECRET: "__TRANSFER_SERVICE_CLIENT_SECRET__"
+  BANK_SERVICES_NOTIFICATION_SERVICE_CLIENT_SECRET: "__NOTIFICATION_SERVICE_CLIENT_SECRET__"
+  BANK_SERVICES_EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET: "__EXCHANGE_GENERATOR_SERVICE_CLIENT_SECRET__"
+
+postgresqlCredentials:
+  password: "__POSTGRESQL_PASSWORD__"
+
+keycloakCredentials:
+  adminUsername: "admin"
+  adminPassword: "__KEYCLOAK_ADMIN_PASSWORD__"
+
+grafanaCredentials:
+  adminUsername: "admin"
+  adminPassword: "__GRAFANA_ADMIN_PASSWORD__"
+```
+
+---
+
+## 🔄 Запуск Jenkins CI/CD
+
+Jenkins запускается вне Kubernetes через Docker:
+
+```bash
+powershell -ExecutionPolicy Bypass -File .\jenkins\scripts\start-jenkins.ps1
+```
+
+После запуска интерфейс доступен по адресу: http://localhost:8090
+
+### Создание учетных данных в Jenkins
+
+Для работы Jenkins Pipeline необходимо зайти в `Manage Jenkins -> Credentials` и создать 4 глобальных секрета:
+
+#### `my-bank-registry-credentials`
 - тип: `Username with password`
-- описание: Используется для публикации Docker images
+- описание: Логин и токен от вашего хранилища образов. Используется на стадии Image push для отправки собранных микросервисов в реестр.
 
----
+#### `my-bank-sops-age-key`
+- тип: `Secret file`
+- описание: Ваш приватный ключ `age` (обычно `keys.txt`), который используется на стадиях Prepare test secrets и Prepare prod secrets для расшифровки файлов `*.enc.yaml`
 
-# Jenkins Pipeline
+#### `my-bank-kubeconfig-test`
+- тип: `Secret file`
+- описание: Сгенерированный скриптом файл jenkins-kubeconfig-test.yaml
 
-В проекте предусмотрены два типа Pipeline:
+```bash
+powershell -ExecutionPolicy Bypass -File .\kubernetes\scripts\create-jenkins-kubeconfig.ps1 -ClusterName test
+```
 
-### Service Pipeline
+#### `my-bank-kubeconfig-prod`
+- тип: `Secret file`
+- описание: Сгенерированный скриптом файл jenkins-kubeconfig-prod.yaml
 
-Используется для отдельного микросервиса.
+```bash
+powershell -ExecutionPolicy Bypass -File .\kubernetes\scripts\create-jenkins-kubeconfig.ps1 -ClusterName prod
+```
 
-Этапы:
-- validate
-- java tests
-- bootJar
-- docker build
-- docker push
-- helm lint
-- helm template
-- deploy test
-- manual approval
-- deploy prod
+### ⚙️ Настройка Umbrella Pipeline
 
-### Umbrella Pipeline
+Пайплайн позволяет собрать все образы, прогнать тесты инфраструктуры, развернуть зонтичный чарт в кластер `test` и (после ручного аппрува) в` prod`.
 
-Используется для полного приложения.
+#### 1. Создать Pipeline: `New Item -> Pipeline`
 
-Выполняет:
-- сборку всех сервисов;
-- создание всех Docker images;
-- deployment umbrella Helm chart.
+#### 2. Выбрать в `Definition`: `Pipeline script from SCM`
 
----
+#### 2. Выбрать в SCM: `Git`
 
-# Запуск Pipeline Jenkins
-
-### 1. Создать Pipeline: `New Item -> Pipeline`
-
-### 2. Выбрать в `Definition`: `Pipeline script from SCM`
-
-### 2. Выбрать в SCM: `Git`
-
-### 3. Выбрать в `Repository URL`:
+#### 3. Выбрать в `Repository URL`:
 
 ```bash
 https://github.com/Adam-and-Eve/my-bank-back-app.git
 ```
 
-### 4. Выбрать в `Branch Specifier (blank for 'any')`:
+#### 4. Выбрать в `Branch Specifier (blank for 'any')`:
 
 ```bash
 */module_three_sprint_eleven_branch
 ```
 
-### 5. Сохранить изменения
+#### 5. Сохранить изменения
 
-### 6. Перейти в `Build with Parameters`
+#### 6. Перейти в `Build with Parameters`
 
-### 7. Указать в `IMAGE_REGISTRY`:
+#### 7. Указать в `IMAGE_REGISTRY`:
 
 ```bash
 docker.io/<docker-login>
 ```
 
-### 8. Указать в `IMAGE_TAG`: `Имя тега`
+#### 8. Указать в `IMAGE_TAG`: `Имя тега`
 
-### 9. Выбрать параметры:
+#### 9. Выбрать параметры:
 - `BUILD_IMAGES`
 - `PUSH_IMAGES`
 - `DEPLOY_TEST`
 - `DEPLOY_PROD`
 
-### 10. Запустить: `Build`
+#### 10. Запустить: `Build`
 
-### 11. Проверить:
+#### 11. Проверить развертывание:
+
+###### Проверить состояние ресурсов в тестовом кластере:
 
 ```bash
-kubectl get pods -n prod
+kubectl --context kind-test get all,ingress,httproute --namespace test
 ```
 
 ```bash
-kubectl port-forward -n prod svc/my-bank-gateway-nginx 8080:80
+kubectl --context kind-test port-forward -n test svc/my-bank-gateway-nginx 8080:80
 ```
 
-http://localhost:8080
+URL: http://localhost:8080
 
-### 12. Удалить и очистить:
-
-```bash
-helm uninstall my-bank -n test
-```
+###### Проверить состояние ресурсов в production-кластере:
 
 ```bash
-kubectl delete namespace test
+kubectl --context kind-prod get all,ingress,httproute --namespace prod
 ```
 
 ```bash
-helm uninstall my-bank -n prod
+kubectl --context kind-prod port-forward -n prod svc/my-bank-gateway-nginx 8080:80
+```
+
+URL: http://localhost:8080
+
+###### Проверить состояние ресурсов в production-кластере:
+
+```bash
+kubectl --context kind-prod get all,ingress,httproute --namespace prod
+```
+
+#### 12. Удалить и очистить:
+
+###### Удалить приложение из тестового кластера:
+
+```bash
+helm uninstall my-bank --kube-context kind-test --namespace test kubectl --context kind-test delete namespace test
+```
+
+###### Удалить приложение из production-кластера:
+
+```bash
+helm uninstall my-bank --kube-context kind-prod --namespace prod kubectl --context kind-prod delete namespace prod
+```
+
+###### Удалить кластеры:
+
+```bash
+kind delete cluster --name test
 ```
 
 ```bash
-kubectl delete namespace prod
+kind delete cluster --name prod
 ```
 
-```bash
-kind delete cluster
-```
+- ##### Остановить Jenkins:
 
 ```bash
-powershell -ExecutionPolicy Bypass `
--File .\jenkins\scripts\stop-jenkins.ps1
+powershell -ExecutionPolicy Bypass ` -File .\jenkins\scripts\stop-jenkins.ps1
 ```
 
 ---
 
-# Kubernetes Deployment вручную
+# 🩺 Доступ к интерфейсам Observability
 
-Обновление зависимостей:
+Интерфейсы инфраструктуры не торчат наружу и доступны только через локальный port-forward (пример для тестового кластера `test`):
+
+### Zipkin (Трассировка)
+
+```bash
+kubectl port-forward -n test service/zipkin 9411:9411
+```
+
+URL: http://localhost:9411
+
+### Grafana (Метрики и Дашборды)
+
+```bash
+kubectl port-forward -n test service/grafana 3000:80
+```
+
+URL: http://localhost:3000
+
+### Kibana (Логи)
+
+```bash
+kubectl port-forward -n test service/kibana 5601:5601
+```
+
+URL: http://localhost:5601
+
+### Prometheus (Алерты и сырые метрики)
+
+```bash
+kubectl port-forward -n test service/prometheus-operated 9090:9090
+```
+
+URL: http://localhost:9090
+
+---
+
+## Kubernetes Deployment вручную
+
+### Обновление зависимостей:
 
 ```bash
 helm dependency update helm/my-bank
 ```
 
-Проверка:
+### Проверка:
 
 ```bash
 helm lint helm/my-bank
 ```
 
-Рендер:
+### Рендер:
 
 ```bash
 helm template my-bank . `
@@ -519,11 +570,11 @@ helm template my-bank . `
   > rendered.yaml
 ```
 
-Установка:
+### Установка:
 
 ```bash
 helm upgrade --install my-bank . `
-  -n my-bank `
+  -n test `
   -f values-test.yaml `
   -f ../values/services/account-service.yaml `
   -f ../values/services/api-gateway.yaml `
@@ -537,14 +588,14 @@ helm upgrade --install my-bank . `
   -f ../../envs/dev/runtime/values-secrets-test.yaml
 ```
 
-Проверка:
+### Проверка:
 
 ```bash
-kubectl get pods -n my-bank
+kubectl --context kind-test get pods -n test
 ```
 
 ```bash
-kubectl port-forward -n my-bank svc/my-bank-gateway-nginx 8080:80
+kubectl port-forward -n test svc/my-bank-gateway-nginx 8080:80
 ```
 
 http://localhost:8080
@@ -558,5 +609,3 @@ http://localhost:8080
 - **Запустите тесты: ./gradlew test**
 - **Соберите проект: ./gradlew clean bootJar**
 - **Создайте Pull Request**
-
----
