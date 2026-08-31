@@ -8,7 +8,8 @@
   {{- $notificationEnv := mergeOverwrite (deepCopy $globalEnv) (default dict $notification.env) -}}
   {{- $kafkaName := default "kafka" $kafka.fullnameOverride -}}
   {{- $mainTopic := get $accountEnv "BANK_KAFKA_NOTIFICATION_TOPIC" | default "bank.notification" -}}
-  {{- $consumerGroup := get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID" | default "bank-notification" -}}
+  {{- $dltTopic := get $accountEnv "BANK_KAFKA_NOTIFICATION_DLT_TOPIC" | default "bank.notification.dlt" -}}
+  {{- $baseConsumerGroup := get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID" | default "bank-notification" -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -33,6 +34,9 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -84,47 +88,44 @@ spec:
             - -ec
             - |
               bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
+              target_group="{{ $baseConsumerGroup }}"
+              topic="{{ $mainTopic }}"
+              dlt_topic="{{ $dltTopic }}"
 
-              topic_id() {
-                /opt/kafka/bin/kafka-topics.sh \
-                  --bootstrap-server "$bootstrap" \
-                  --describe \
-                  --topic "{{ $mainTopic }}" |
-                  sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' |
-                  head -n 1
+              get_committed_offset() {
+                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $3} END {print sum}'
+              }
+              
+              get_dlt_size() {
+                /opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$bootstrap" --topic "$dlt_topic" --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}'
               }
 
-              group_offsets() {
-                /opt/kafka/bin/kafka-consumer-groups.sh \
-                  --bootstrap-server "$bootstrap" \
-                  --describe \
-                  --group "{{ $consumerGroup }}" 2>/dev/null |
-                  awk '$2 == "{{ $mainTopic }}" {print $3 ":" $4}' |
-                  sort
-              }
+              initial_commit="$(get_committed_offset)"
+              test -z "$initial_commit" && initial_commit=0
+              
+              initial_dlt="$(get_dlt_size)"
+              test -z "$initial_dlt" && initial_dlt=0
 
               event_id="$(cat /proc/sys/kernel/random/uuid)"
-              operation_id="$(cat /proc/sys/kernel/random/uuid)"
-              occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              event="{\"eventId\":\"$event_id\",\"operationId\":\"$operation_id\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test\",\"message\":\"Helm persistence test\",\"occurredAt\":\"$occurred_at\",\"amount\":null,\"currency\":null}"
-              printf 'helm-persistence-test|%s\n' "$event" |
-                /opt/kafka/bin/kafka-console-producer.sh \
-                  --bootstrap-server "$bootstrap" \
-                  --topic "{{ $mainTopic }}" \
-                  --property parse.key=true \
-                  --property key.separator='|'
+              event="{\"eventId\":\"$event_id\",\"operationId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test-1\",\"message\":\"Persistence test 1\",\"occurredAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"amount\":null,\"currency\":null}"
+              
+              printf 'helm-persistence-test-1|%s\n' "$event" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server "$bootstrap" --topic "$topic" --property parse.key=true --property key.separator='|'
 
-              before_offsets=""
-              for attempt in $(seq 1 60); do
-                before_offsets="$(group_offsets)"
-                test -n "$before_offsets" && break
+              current_commit="$initial_commit"
+              for i in $(seq 1 60); do
+                current_commit="$(get_committed_offset)"
+                test -z "$current_commit" && current_commit=0
+                test "$current_commit" -gt "$initial_commit" && break
                 sleep 1
               done
-              test -n "$before_offsets"
-              before_topic_id="$(topic_id)"
-              test -n "$before_topic_id"
-              printf '%s\n' "$before_topic_id" > /state/topic-id
-              printf '%s\n' "$before_offsets" > /state/offsets
+              test "$current_commit" -gt "$initial_commit"
+
+              topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
+
+              printf '%s\n' "$topic_id" > /state/topic-id
+              printf '%s\n' "$event_id" > /state/event1-id
+              printf '%s\n' "$event" > /state/payload1
+              printf '%s\n' "$initial_dlt" > /state/dlt-before
         - name: delete-kafka
           image: {{ required "helmTest.kubectlImage is required" $test.kubectlImage | quote }}
           imagePullPolicy: {{ $test.imagePullPolicy | default "IfNotPresent" }}
@@ -168,20 +169,48 @@ spec:
             - -ec
             - |
               bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
+              target_group="{{ $baseConsumerGroup }}"
+              topic="{{ $mainTopic }}"
+              dlt_topic="{{ $dltTopic }}"
 
-              after_topic_id="$(/opt/kafka/bin/kafka-topics.sh \
-                --bootstrap-server "$bootstrap" \
-                --describe \
-                --topic "{{ $mainTopic }}" |
-                sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' |
-                head -n 1)"
-              after_offsets="$(/opt/kafka/bin/kafka-consumer-groups.sh \
-                --bootstrap-server "$bootstrap" \
-                --describe \
-                --group "{{ $consumerGroup }}" 2>/dev/null |
-                awk '$2 == "{{ $mainTopic }}" {print $3 ":" $4}' |
-                sort)"
-
+              after_topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
               test "$after_topic_id" = "$(cat /state/topic-id)"
-              test "$after_offsets" = "$(cat /state/offsets)"
+
+              event1_id="$(cat /state/event1-id)"
+              payload1="$(cat /state/payload1)"
+              unique_reader_group="test-reader-$(cat /proc/sys/kernel/random/uuid)"
+              
+              consumed_data="$(/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server "$bootstrap" --topic "$topic" --group "$unique_reader_group" --from-beginning --timeout-ms 10000 2>/dev/null || true)"
+              
+              echo "$consumed_data" | grep -q "$event1_id"
+              echo "$consumed_data" | grep -q "$payload1"
+
+              kubectl rollout restart deployment/{{ include "my-bank.fullname" . }}-notification-service
+              kubectl rollout status deployment/{{ include "my-bank.fullname" . }}-notification-service --timeout=120s
+
+              get_committed_offset() {
+                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $3} END {print sum}'
+              }
+              
+              commit_before_event2="$(get_committed_offset)"
+              test -z "$commit_before_event2" && commit_before_event2=0
+
+              event2_id="$(cat /proc/sys/kernel/random/uuid)"
+              event2="{\"eventId\":\"$event2_id\",\"operationId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test-2\",\"message\":\"Persistence test 2\",\"occurredAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"amount\":null,\"currency\":null}"
+              
+              printf 'helm-persistence-test-2|%s\n' "$event2" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server "$bootstrap" --topic "$topic" --property parse.key=true --property key.separator='|'
+
+              commit_after_event2="$commit_before_event2"
+              for i in $(seq 1 60); do
+                commit_after_event2="$(get_committed_offset)"
+                test -z "$commit_after_event2" && commit_after_event2=0
+                test "$commit_after_event2" -gt "$commit_before_event2" && break
+                sleep 1
+              done
+              test "$commit_after_event2" -gt "$commit_before_event2"
+
+              dlt_before="$(cat /state/dlt-before)"
+              dlt_after="$(/opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$bootstrap" --topic "$dlt_topic" --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}')"
+              test -z "$dlt_after" && dlt_after=0
+              test "$dlt_after" -eq "$dlt_before"
   {{- end }}
