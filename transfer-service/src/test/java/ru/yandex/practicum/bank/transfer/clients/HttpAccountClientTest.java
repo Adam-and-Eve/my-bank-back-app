@@ -22,6 +22,7 @@ import ru.yandex.practicum.bank.transfer.viewmodels.TransferOperationViewModel;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -113,7 +114,10 @@ public class HttpAccountClientTest {
                 "alexey",
                 new BigDecimal("500.00"),
                 CurrencyEnumModel.RUB,
-                "op-123"
+                new BigDecimal("500.00"),
+                CurrencyEnumModel.RUB,
+                "op-123",
+                List.of()
         );
 
         var accountRequest = new AccountTransferRequestViewModel(
@@ -123,7 +127,8 @@ public class HttpAccountClientTest {
                 CurrencyEnumModel.RUB,
                 new BigDecimal("500.00"),
                 CurrencyEnumModel.RUB,
-                "op-123"
+                "op-123",
+                List.of()
         );
 
         when(accountTransferMapper.toAccountRequest(operation))
@@ -156,12 +161,16 @@ public class HttpAccountClientTest {
         verify(accountTransferMapper).toAccountRequest(operation);
 
         assertThat(result).isNotNull();
+
         assertThat(result.senderLogin())
                 .isEqualTo("dmitry");
+
         assertThat(result.recipientLogin())
                 .isEqualTo("alexey");
+
         assertThat(result.senderBalance())
                 .isEqualByComparingTo("1500.00");
+
         assertThat(result.currency())
                 .isEqualTo("RUB");
     }
@@ -184,7 +193,8 @@ public class HttpAccountClientTest {
                 CurrencyEnumModel.USD,
                 new BigDecimal("9200.00"),
                 CurrencyEnumModel.RUB,
-                "op-123"
+                "op-123",
+                List.of()
         );
 
         var accountRequest = new AccountTransferRequestViewModel(
@@ -194,7 +204,8 @@ public class HttpAccountClientTest {
                 CurrencyEnumModel.USD,
                 new BigDecimal("9200.00"),
                 CurrencyEnumModel.RUB,
-                "op-123"
+                "op-123",
+                List.of()
         );
 
         when(accountTransferMapper.toAccountRequest(operation))
@@ -225,10 +236,13 @@ public class HttpAccountClientTest {
 
         assertThat(result.senderLogin())
                 .isEqualTo("dmitry");
+
         assertThat(result.recipientLogin())
                 .isEqualTo("alexey");
+
         assertThat(result.senderBalance())
                 .isEqualByComparingTo("900.00");
+
         assertThat(result.currency())
                 .isEqualTo("USD");
     }
@@ -398,7 +412,10 @@ public class HttpAccountClientTest {
                 "alexey",
                 new BigDecimal("100.00"),
                 CurrencyEnumModel.RUB,
-                "op-123"
+                new BigDecimal("100.00"),
+                CurrencyEnumModel.RUB,
+                "op-123",
+                List.of()
         );
     }
 
@@ -410,7 +427,8 @@ public class HttpAccountClientTest {
                 CurrencyEnumModel.RUB,
                 new BigDecimal("100.00"),
                 CurrencyEnumModel.RUB,
-                "op-123"
+                "op-123",
+                List.of()
         );
     }
 

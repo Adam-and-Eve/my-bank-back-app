@@ -1,21 +1,24 @@
 package ru.yandex.practicum.bank.shared.publishers;
 
 import io.micrometer.core.instrument.MeterRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.apache.kafka.common.errors.AuthenticationException;
 import org.apache.kafka.common.errors.AuthorizationException;
 import org.apache.kafka.common.errors.SerializationException;
 import org.apache.kafka.common.errors.TimeoutException;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
 import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
+
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <summary>
  * Реализация издателя событий уведомлений, осуществляющая отправку сообщений в брокер Apache Kafka.
- * Включает логирование результатов отправки и сбор метрик ошибок.
+ * Включает логирование результатов отправки, сбор метрик ошибок и синхронную обработку исключений для паттерна Outbox.
  * </summary>
  */
 public class KafkaNotificationEventPublisher implements NotificationEventPublisher {
@@ -35,7 +38,7 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
      * <summary>
      * Создает новый экземпляр издателя событий для Kafka.
      * </summary>
-     * @param kafkaTemplate Шаблон Kafka для асинхронной отправки сообщений.
+     * @param kafkaTemplate Шаблон Kafka для отправки сообщений.
      * @param meterRegistry Реестр для записи метрик (в частности, счетчиков ошибок).
      * @param topic Целевой топик Kafka, в который будут отправляться уведомления.
      */
@@ -55,36 +58,45 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
 
     /**
      * <summary>
-     * Асинхронно публикует событие уведомления в Kafka-топик.
-     * В случае успешной отправки логирует метаданные (партицию, смещение), в случае ошибки — фиксирует сбой.
+     * Синхронно публикует событие уведомления в Kafka-топик.
+     * Ожидает подтверждения (ack) от брокера. В случае ошибки выбрасывает RuntimeException,
+     * чтобы вызывающий код (Relay-процесс) мог корректно отработать сбой.
      * </summary>
      * @param event Модель события уведомления NotificationEventModel для публикации.
      */
     @Override
     public void publish(NotificationEventModel event) {
         try {
-            kafkaTemplate.send(topic, event.recipientLogin(), event)
-                    .whenComplete((result, exception) -> {
-                        if (exception != null) {
-                            logFailure(event, exception);
+            var result = kafkaTemplate.send(topic, event.recipientLogin(), event)
+                    .get(10, TimeUnit.SECONDS);
 
-                            return;
-                        }
+            var metadata = result.getRecordMetadata();
 
-                        var metadata = result.getRecordMetadata();
+            log.info(
+                    "Notification event sent: eventId={}, operationId={}, source={}, topic={}, partition={}, offset={}",
+                    event.eventId(),
+                    event.operationId(),
+                    event.source(),
+                    metadata.topic(),
+                    metadata.partition(),
+                    metadata.offset()
+            );
+        } catch (ExecutionException exception) {
+            var cause = exception.getCause();
 
-                        log.info(
-                                "Notification event sent: eventId={}, operationId={}, source={}, topic={}, partition={}, offset={}",
-                                event.eventId(),
-                                event.operationId(),
-                                event.source(),
-                                metadata.topic(),
-                                metadata.partition(),
-                                metadata.offset()
-                        );
-                    });
+            logFailure(event, cause);
+
+            throw new RuntimeException("Kafka send failed for event: " + event.eventId(), cause);
+        } catch (InterruptedException | java.util.concurrent.TimeoutException exception) {
+            logFailure(event, exception);
+
+            Thread.currentThread().interrupt();
+
+            throw new RuntimeException("Kafka send interrupted or timed out for event: " + event.eventId(), exception);
         } catch (RuntimeException exception) {
             logFailure(event, exception);
+
+            throw exception;
         }
     }
 
@@ -99,7 +111,7 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
         var errorCategory = errorCategory(exception);
 
         meterRegistry.counter(
-                "bank.kafka.publication.failures",
+                "my.bank.kafka.publication.failures",
                 "source", event.source().name(),
                 "topic", topic,
                 "error_category", errorCategory
@@ -118,7 +130,7 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
 
     /**
      * <summary>
-     * Классифицирует ошибку на основе типа исходного исключения (таймаут, сериализация, безопасность или другое).
+     * Классифицирует ошибку на основе типа исходного исключения.
      * </summary>
      * @param exception Перехваченное исключение.
      * @return Строковое название категории ошибки.
@@ -151,7 +163,7 @@ public class KafkaNotificationEventPublisher implements NotificationEventPublish
      * Извлекает первопричину (root cause) из иерархии вложенных исключений.
      * </summary>
      * @param exception Верхнеуровневое исключение.
-     * @return Исходное исключение, спровоцировавшее сбой.
+     * @return Исходное исключение.
      */
     private Throwable rootCause(Throwable exception) {
         var cause = exception;

@@ -1,7 +1,5 @@
 package ru.yandex.practicum.bank.cash.services;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,7 +17,6 @@ import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
 import ru.yandex.practicum.bank.shared.interfaces.BlockerClient;
 import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
-import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 import ru.yandex.practicum.bank.shared.models.NotificationSourceEnumModel;
@@ -33,11 +30,13 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -49,8 +48,8 @@ import static org.mockito.Mockito.when;
  * <summary>
  * Модульные тесты для реализации сервиса CashServiceImpl.
  * Проверяют бизнес-логику пополнения и снятия средств, валидацию входящих сумм,
- * проверку операций через Blocker Service, конвертацию валют через Exchange Service,
- * корректное преобразование данных маппером и отправку уведомлений в Kafka.
+ * проверку операций через Blocker Service, конвертацию валют через Exchange Service
+ * и корректную передачу сформированных уведомлений мапперу.
  * </summary>
  **/
 @ExtendWith(MockitoExtension.class)
@@ -77,9 +76,6 @@ public class CashServiceImplTest {
     private ExchangeClient exchangeClient;
 
     @Mock
-    private NotificationEventPublisher notificationEventPublisher;
-
-    @Mock
     private AccountBalanceMapper accountBalanceMapper;
 
     private Clock clock;
@@ -98,7 +94,6 @@ public class CashServiceImplTest {
                 accountClient,
                 blockerClient,
                 exchangeClient,
-                notificationEventPublisher,
                 accountBalanceMapper,
                 clock
         );
@@ -111,10 +106,11 @@ public class CashServiceImplTest {
     /**
      * <summary>
      * Проверяет успешную операцию пополнения счета в RUB после разрешения операции
-     * сервисом блокировки.
+     * сервисом блокировки и корректную сборку уведомления.
      * </summary>
      **/
     @Test
+    @SuppressWarnings("unchecked")
     public void shouldDepositSuccessfully() {
         var amount = new BigDecimal("500.00");
 
@@ -156,13 +152,15 @@ public class CashServiceImplTest {
 
         assertThat(blockerRequest.currency()).isEqualTo(CurrencyEnumModel.RUB);
 
-        verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID));
+        ArgumentCaptor<List<NotificationEventModel>> notificationCaptor = ArgumentCaptor.forClass(List.class);
 
-        var notificationCaptor = ArgumentCaptor.forClass(NotificationEventModel.class);
+        verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID), notificationCaptor.capture());
 
-        verify(notificationEventPublisher).publish(notificationCaptor.capture());
+        var notifications = notificationCaptor.getValue();
 
-        var notification = notificationCaptor.getValue();
+        assertThat(notifications).hasSize(1);
+
+        var notification = notifications.getFirst();
 
         assertThat(notification.recipientLogin()).isEqualTo(TEST_LOGIN);
 
@@ -182,10 +180,11 @@ public class CashServiceImplTest {
     /**
      * <summary>
      * Проверяет успешную операцию снятия средств в RUB после разрешения операции
-     * сервисом блокировки.
+     * сервисом блокировки и корректную сборку уведомления.
      * </summary>
      **/
     @Test
+    @SuppressWarnings("unchecked")
     public void shouldWithdrawSuccessfully() {
         var amount = new BigDecimal("200.00");
 
@@ -221,13 +220,15 @@ public class CashServiceImplTest {
 
         assertThat(blockerRequest.operationType()).isEqualTo(OperationTypeEnumModel.WITHDRAW);
 
-        verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID));
+        ArgumentCaptor<List<NotificationEventModel>> notificationCaptor = ArgumentCaptor.forClass(List.class);
 
-        var notificationCaptor = ArgumentCaptor.forClass(NotificationEventModel.class);
+        verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID), notificationCaptor.capture());
 
-        verify(notificationEventPublisher).publish(notificationCaptor.capture());
+        var notifications = notificationCaptor.getValue();
 
-        var notification = notificationCaptor.getValue();
+        assertThat(notifications).hasSize(1);
+
+        var notification = notifications.getFirst();
 
         assertThat(notification.recipientLogin()).isEqualTo(TEST_LOGIN);
 
@@ -335,7 +336,7 @@ public class CashServiceImplTest {
     /**
      * <summary>
      * Проверяет, что конвертация и проверка операции выполняются
-     * до изменения баланса и отправки уведомления.
+     * до изменения баланса.
      * </summary>
      **/
     @Test
@@ -368,19 +369,16 @@ public class CashServiceImplTest {
                 exchangeClient,
                 blockerClient,
                 accountBalanceMapper,
-                accountClient,
-                notificationEventPublisher
+                accountClient
         );
 
         inOrder.verify(exchangeClient).convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount);
 
         inOrder.verify(blockerClient).check(any(OperationCheckRequestViewModel.class));
 
-        inOrder.verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID));
+        inOrder.verify(accountBalanceMapper).toAccountsRequest(eq(TEST_LOGIN), eq(request), eq(TEST_OPERATION_ID), anyList());
 
         inOrder.verify(accountClient).deposit(any());
-
-        inOrder.verify(notificationEventPublisher).publish(any(NotificationEventModel.class));
     }
 
     /**
@@ -401,7 +399,7 @@ public class CashServiceImplTest {
 
         verify(blockerClient).check(any(OperationCheckRequestViewModel.class));
 
-        verifyNoInteractions(accountClient, exchangeClient, accountBalanceMapper, notificationEventPublisher);
+        verifyNoInteractions(accountClient, exchangeClient, accountBalanceMapper);
     }
 
     /**
@@ -422,7 +420,7 @@ public class CashServiceImplTest {
 
         verify(blockerClient).check(any(OperationCheckRequestViewModel.class));
 
-        verifyNoInteractions(accountClient, exchangeClient, accountBalanceMapper, notificationEventPublisher);
+        verifyNoInteractions(accountClient, exchangeClient, accountBalanceMapper);
     }
 
     /**
@@ -463,7 +461,7 @@ public class CashServiceImplTest {
 
         verify(exchangeClient).convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, amount);
 
-        verifyNoInteractions(accountClient, accountBalanceMapper, notificationEventPublisher);
+        verifyNoInteractions(accountClient, accountBalanceMapper);
     }
 
     /**
@@ -564,7 +562,7 @@ public class CashServiceImplTest {
         assertThatThrownBy(() -> cashService.withdraw(TEST_LOGIN, negativeRequest, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountException.class);
 
-        verifyNoInteractions(accountClient, blockerClient, exchangeClient, notificationEventPublisher, accountBalanceMapper);
+        verifyNoInteractions(accountClient, blockerClient, exchangeClient, accountBalanceMapper);
     }
 
     /**
@@ -583,7 +581,7 @@ public class CashServiceImplTest {
         assertThatThrownBy(() -> cashService.withdraw(TEST_LOGIN, invalidScaleRequest, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountScaleException.class);
 
-        verifyNoInteractions(accountClient, blockerClient, exchangeClient, notificationEventPublisher, accountBalanceMapper);
+        verifyNoInteractions(accountClient, blockerClient, exchangeClient, accountBalanceMapper);
     }
 
     // endregion

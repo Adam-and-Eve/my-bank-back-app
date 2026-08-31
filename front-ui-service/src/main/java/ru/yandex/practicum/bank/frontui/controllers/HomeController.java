@@ -3,14 +3,13 @@ package ru.yandex.practicum.bank.frontui.controllers;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import ru.yandex.practicum.bank.frontui.interfaces.GatewayClient;
 import ru.yandex.practicum.bank.frontui.exceptions.GatewayClientException;
@@ -19,6 +18,7 @@ import ru.yandex.practicum.bank.frontui.helpers.SecurityUserContextHelper;
 import ru.yandex.practicum.bank.frontui.viewmodels.*;
 
 import java.security.Principal;
+import java.util.Map;
 
 /**
  * <summary>
@@ -76,6 +76,55 @@ public class HomeController {
         log.info("Home page loaded status=success source=front-ui-service");
 
         return "index";
+    }
+
+    /**
+     * <summary>
+     * Возвращает актуальные курсы валют в формате JSON для динамического обновления
+     * на главной странице с помощью AJAX/Polling.
+     * Получает токен доступа из текущего контекста аутентификации
+     * и запрашивает данные через GatewayClient.
+     * При недоступности сервиса возвращает HTTP 503
+     * с сообщением о временной недоступности сервиса.
+     * </summary>
+     **/
+    @GetMapping("/api/exchange-rates")
+    @ResponseBody
+    public ResponseEntity<?> getExchangeRatesJson(
+            Authentication authentication) {
+        try {
+            if (log.isDebugEnabled()) {
+                log.debug(
+                        "Front downstream action prepared " +
+                                "operationType=UPDATE_EXCHANGE_RATES " +
+                                "source=front-ui-service targetService=api-gateway"
+                );
+            }
+
+            var accessToken = securityUserContext.getAccessToken(authentication);
+
+            var rates = gatewayClient.getExchangeRates(accessToken);
+
+            log.info(
+                    "Front downstream action completed " +
+                            "operationType=UPDATE_EXCHANGE_RATES status=success " +
+                            "source=front-ui-service targetService=api-gateway"
+            );
+
+            return ResponseEntity.ok(rates);
+        } catch (GatewayClientException exception) {
+            modelFactory.logGatewayClientFailure(
+                    "UPDATE_EXCHANGE_RATES",
+                    exception
+            );
+
+            return ResponseEntity
+                    .status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of(
+                            "message",
+                            "Сервис курсов валют временно недоступен"
+                    ));
+        }
     }
 
     /**

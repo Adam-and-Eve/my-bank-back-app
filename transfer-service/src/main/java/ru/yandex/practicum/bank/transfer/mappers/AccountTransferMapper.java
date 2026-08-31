@@ -32,7 +32,8 @@ public class AccountTransferMapper {
                 operation.currency(),
                 operation.recipientAmount(),
                 operation.recipientCurrency(),
-                operation.operationId()
+                operation.operationId(),
+                operation.notifications()
         );
     }
 

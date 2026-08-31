@@ -1,8 +1,10 @@
 package ru.yandex.practicum.bank.cash.viewmodels;
 
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * <summary>
@@ -18,6 +20,7 @@ public record AccountBalanceOperationRequestViewModel(
         String login,
         BigDecimal amount,
         CurrencyEnumModel currency,
-        String operationId
+        String operationId,
+        List<NotificationEventModel> notifications
 ) {
 }

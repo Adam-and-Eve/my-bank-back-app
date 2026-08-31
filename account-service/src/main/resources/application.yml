@@ -35,6 +35,10 @@ spring:
           jwk-set-uri: ${BANK_KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/certs}
 
 bank:
+  outbox:
+    relay:
+      delay: ${BANK_OUTBOX_RELAY_DELAY:2000}
+      retry-backoff: ${BANK_OUTBOX_RELAY_RETRY_BACKOFF:5s}
   balance:
     retry:
       max-attempts: ${BANK_BALANCE_RETRY_MAX_ATTEMPTS:3}

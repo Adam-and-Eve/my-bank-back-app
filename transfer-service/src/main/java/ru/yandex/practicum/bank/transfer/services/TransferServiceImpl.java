@@ -1,29 +1,22 @@
 package ru.yandex.practicum.bank.transfer.services;
 
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.bank.shared.interfaces.BlockerClient;
 import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
-import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.*;
 import ru.yandex.practicum.bank.shared.viewmodels.ConversionResponseViewModel;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
-import ru.yandex.practicum.bank.transfer.exceptions.InvalidAmountException;
-import ru.yandex.practicum.bank.transfer.exceptions.InvalidAmountScaleException;
-import ru.yandex.practicum.bank.transfer.exceptions.OperationBlockedException;
-import ru.yandex.practicum.bank.transfer.exceptions.SelfTransferForbiddenException;
+import ru.yandex.practicum.bank.transfer.exceptions.*;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferExecutor;
 import ru.yandex.practicum.bank.transfer.interfaces.TransferService;
-import ru.yandex.practicum.bank.transfer.viewmodels.TransferOperationViewModel;
-import ru.yandex.practicum.bank.transfer.viewmodels.TransferRequestViewModel;
-import ru.yandex.practicum.bank.transfer.viewmodels.TransferResponseViewModel;
+import ru.yandex.practicum.bank.transfer.viewmodels.*;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -40,7 +33,6 @@ public class TransferServiceImpl implements TransferService {
     private final TransferExecutor transferExecutor;
     private final BlockerClient blockerClient;
     private final ExchangeClient exchangeClient;
-    private final NotificationEventPublisher notificationEventPublisher;
     private final Clock clock;
     private static final Logger log = LoggerFactory.getLogger(TransferServiceImpl.class);
 
@@ -52,12 +44,10 @@ public class TransferServiceImpl implements TransferService {
             TransferExecutor transferExecutor,
             BlockerClient blockerClient,
             ExchangeClient exchangeClient,
-            NotificationEventPublisher notificationEventPublisher,
             Clock clock) {
         this.transferExecutor = transferExecutor;
         this.blockerClient = blockerClient;
         this.exchangeClient = exchangeClient;
-        this.notificationEventPublisher = notificationEventPublisher;
         this.clock = clock;
     }
 
@@ -83,7 +73,7 @@ public class TransferServiceImpl implements TransferService {
             String senderLogin,
             TransferRequestViewModel request,
             UUID operationId) {
-        validateAmount(request.amount(), operationId, request.currency(), senderLogin, request.recipientLogin());
+        validateAmount(request.amount(), operationId, request.currency());
 
         if (senderLogin.equals(request.recipientLogin())) {
             log.warn(
@@ -101,6 +91,8 @@ public class TransferServiceImpl implements TransferService {
 
         var conversion = convert(request);
 
+        var notifications = buildNotifications(senderLogin, request, conversion, operationId);
+
         var result = transferExecutor.execute(new TransferOperationViewModel(
                 senderLogin,
                 request.recipientLogin(),
@@ -108,10 +100,9 @@ public class TransferServiceImpl implements TransferService {
                 request.currency(),
                 conversion.targetAmount(),
                 conversion.targetCurrency(),
-                operationId.toString()
+                operationId.toString(),
+                notifications
         ));
-
-        publishNotifications(senderLogin, request, conversion, operationId);
 
         log.info(
                 "Transfer operation completed operationId={} operationType=TRANSFER currency={} status=success source=transfer-service targetService=account-service",
@@ -139,9 +130,7 @@ public class TransferServiceImpl implements TransferService {
     private void validateAmount(
             BigDecimal amount,
             UUID operationId,
-            CurrencyEnumModel currency,
-            String senderLogin,
-            String recipientLogin) {
+            CurrencyEnumModel currency) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn(
                     "Transfer operation rejected operationId={} operationType=TRANSFER currency={} status=rejected errorCode=INVALID_AMOUNT source=transfer-service",
@@ -260,7 +249,12 @@ public class TransferServiceImpl implements TransferService {
         return exchangeClient.convert(request.currency(), request.resolvedTargetCurrency(), request.amount());
     }
 
-    private void publishNotifications(
+    /**
+     * <summary>
+     * Формирует список событий-уведомлений для отправителя и получателя.
+     * </summary>
+     **/
+    private List<NotificationEventModel> buildNotifications(
             String senderLogin,
             TransferRequestViewModel request,
             ConversionResponseViewModel conversion,
@@ -268,31 +262,32 @@ public class TransferServiceImpl implements TransferService {
     ) {
         var occurredAt = Instant.now(clock);
 
-        notificationEventPublisher.publish(new NotificationEventModel(
-                UUID.randomUUID(),
-                operationId,
-                NotificationSourceEnumModel.TRANSFER,
-                NotificationTypeEnumModel.TRANSFER_OUTGOING,
-                senderLogin,
-                "Перевод пользователю " + request.recipientLogin() + ": "
-                        + conversion.sourceAmount() + " " + conversion.sourceCurrency(),
-                occurredAt,
-                conversion.sourceAmount(),
-                conversion.sourceCurrency()
-        ));
-
-        notificationEventPublisher.publish(new NotificationEventModel(
-                UUID.randomUUID(),
-                operationId,
-                NotificationSourceEnumModel.TRANSFER,
-                NotificationTypeEnumModel.TRANSFER_INCOMING,
-                request.recipientLogin(),
-                "Получен перевод от " + senderLogin + ": "
-                        + conversion.targetAmount() + " " + conversion.targetCurrency(),
-                occurredAt,
-                conversion.targetAmount(),
-                conversion.targetCurrency()
-        ));
+        return List.of(
+                new NotificationEventModel(
+                        UUID.randomUUID(),
+                        operationId,
+                        NotificationSourceEnumModel.TRANSFER,
+                        NotificationTypeEnumModel.TRANSFER_OUTGOING,
+                        senderLogin,
+                        "Перевод пользователю " + request.recipientLogin() + ": "
+                                + conversion.sourceAmount() + " " + conversion.sourceCurrency(),
+                        occurredAt,
+                        conversion.sourceAmount(),
+                        conversion.sourceCurrency()
+                ),
+                new NotificationEventModel(
+                        UUID.randomUUID(),
+                        operationId,
+                        NotificationSourceEnumModel.TRANSFER,
+                        NotificationTypeEnumModel.TRANSFER_INCOMING,
+                        request.recipientLogin(),
+                        "Получен перевод от " + senderLogin + ": "
+                                + conversion.targetAmount() + " " + conversion.targetCurrency(),
+                        occurredAt,
+                        conversion.targetAmount(),
+                        conversion.targetCurrency()
+                )
+        );
     }
 
     // endregion

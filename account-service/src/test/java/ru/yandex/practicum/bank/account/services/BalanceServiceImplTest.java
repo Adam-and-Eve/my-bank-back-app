@@ -15,6 +15,7 @@ import ru.yandex.practicum.bank.account.viewmodels.TransferBalanceResponseViewMo
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -358,7 +359,8 @@ public class BalanceServiceImplTest {
                 LOGIN,
                 AMOUNT,
                 CURRENCY,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
     }
 
@@ -368,7 +370,8 @@ public class BalanceServiceImplTest {
                 RECIPIENT_LOGIN,
                 AMOUNT,
                 CURRENCY,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
     }
 

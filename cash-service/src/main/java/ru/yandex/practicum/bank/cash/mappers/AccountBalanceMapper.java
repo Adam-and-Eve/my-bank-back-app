@@ -3,7 +3,9 @@ package ru.yandex.practicum.bank.cash.mappers;
 import org.springframework.stereotype.Component;
 import ru.yandex.practicum.bank.cash.viewmodels.AccountBalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -32,13 +34,15 @@ public class AccountBalanceMapper {
     public AccountBalanceOperationRequestViewModel toAccountsRequest(
             String login,
             CashOperationRequestViewModel request,
-            UUID operationId
+            UUID operationId,
+            List<NotificationEventModel> notifications
     ) {
         return new AccountBalanceOperationRequestViewModel(
                 login,
                 request.amount(),
                 request.currency(),
-                operationId.toString()
+                operationId.toString(),
+                notifications
         );
     }
 

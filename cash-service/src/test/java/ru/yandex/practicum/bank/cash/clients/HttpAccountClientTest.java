@@ -20,6 +20,7 @@ import ru.yandex.practicum.bank.shared.providers.ServiceTokenProvider;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -107,15 +108,18 @@ public class HttpAccountClientTest {
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + TEST_TOKEN))
                 .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
 
-        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("500.00"), CurrencyEnumModel.RUB, "op-123");
+        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("500.00"), CurrencyEnumModel.RUB, "op-123", List.of());
 
         var result = accountClient.deposit(request);
 
         mockServer.verify();
 
         assertThat(result).isNotNull();
+
         assertThat(result.login()).isEqualTo("alexey");
+
         assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("1500.00"));
+
         assertThat(result.currency()).isEqualTo("RUB");
     }
 
@@ -141,15 +145,18 @@ public class HttpAccountClientTest {
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + TEST_TOKEN))
                 .andRespond(withSuccess(jsonResponse, MediaType.APPLICATION_JSON));
 
-        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("500.00"), CurrencyEnumModel.RUB, "op-124");
+        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("500.00"), CurrencyEnumModel.RUB, "op-124", List.of());
 
         var result = accountClient.withdraw(request);
 
         mockServer.verify();
 
         assertThat(result).isNotNull();
+
         assertThat(result.login()).isEqualTo("alexey");
+
         assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("1000.00"));
+
         assertThat(result.currency()).isEqualTo("RUB");
     }
 
@@ -169,13 +176,12 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        // Для 400 ошибок Retry обычно не срабатывает, но на всякий случай разрешаем несколько вызовов
         mockServer.expect(ExpectedCount.manyTimes(), requestTo(WITHDRAW_URI))
                 .andRespond(withStatus(HttpStatus.BAD_REQUEST)
                         .body(errorResponseJson)
                         .contentType(MediaType.APPLICATION_JSON));
 
-        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("50000.00"), CurrencyEnumModel.RUB, "op-125");
+        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("50000.00"), CurrencyEnumModel.RUB, "op-125", List.of());
 
         assertThatThrownBy(() -> accountClient.withdraw(request))
                 .isInstanceOf(AccountClientException.class)
@@ -198,13 +204,12 @@ public class HttpAccountClientTest {
                 }
                 """;
 
-        // ExpectedCount.manyTimes() критически важен здесь из-за механизма Retry для 500 ошибок
         mockServer.expect(ExpectedCount.manyTimes(), requestTo(DEPOSIT_URI))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body(errorResponseJson)
                         .contentType(MediaType.APPLICATION_JSON));
 
-        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-126");
+        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-126", List.of());
 
         assertThatThrownBy(() -> accountClient.deposit(request))
                 .isInstanceOf(AccountClientException.class)
@@ -220,13 +225,12 @@ public class HttpAccountClientTest {
     public void shouldFallbackToDefaultMessageWhenResponseBodyIsMalformedJson() {
         when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
 
-        // ExpectedCount.manyTimes() критически важен здесь из-за механизма Retry для 500 ошибок
         mockServer.expect(ExpectedCount.manyTimes(), requestTo(DEPOSIT_URI))
                 .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Internal Server Error (Html or plain text)")
                         .contentType(MediaType.TEXT_PLAIN));
 
-        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-127");
+        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-127", List.of());
 
         assertThatThrownBy(() -> accountClient.deposit(request))
                 .isInstanceOf(AccountClientException.class)
@@ -242,11 +246,10 @@ public class HttpAccountClientTest {
     public void shouldHandleNetworkFailure() {
         when(serviceTokenProvider.getAccessToken()).thenReturn(TEST_TOKEN);
 
-        // ExpectedCount.manyTimes() критически важен здесь из-за механизма Retry для IOException
         mockServer.expect(ExpectedCount.manyTimes(), requestTo(DEPOSIT_URI))
                 .andRespond(withException(new IOException("Connection refused")));
 
-        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-128");
+        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-128", List.of());
 
         assertThatThrownBy(() -> accountClient.deposit(request))
                 .isInstanceOf(AccountClientException.class)
@@ -262,7 +265,7 @@ public class HttpAccountClientTest {
     public void shouldThrowUnavailableExceptionWhenCircuitBreakerTriggersOnGenericError() {
         when(serviceTokenProvider.getAccessToken()).thenThrow(new RuntimeException("OAuth2 Identity Provider unavailable"));
 
-        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-129");
+        var request = new AccountBalanceOperationRequestViewModel("alexey", new BigDecimal("100.00"), CurrencyEnumModel.RUB, "op-129", List.of());
 
         assertThatThrownBy(() -> accountClient.deposit(request))
                 .isInstanceOf(AccountClientException.class)

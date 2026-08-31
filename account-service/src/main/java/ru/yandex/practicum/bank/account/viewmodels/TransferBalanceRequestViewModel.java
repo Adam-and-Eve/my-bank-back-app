@@ -3,8 +3,10 @@ package ru.yandex.practicum.bank.account.viewmodels;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * <summary>
@@ -38,7 +40,9 @@ public record TransferBalanceRequestViewModel (
         CurrencyEnumModel recipientCurrency,
 
         @NotBlank
-        String operationId
+        String operationId,
+
+        List<NotificationEventModel> notifications
 ) {
 
         public TransferBalanceRequestViewModel(
@@ -46,9 +50,10 @@ public record TransferBalanceRequestViewModel (
                 String recipientLogin,
                 BigDecimal amount,
                 CurrencyEnumModel currency,
-                String operationId
+                String operationId,
+                List<NotificationEventModel> notifications
         ) {
-                this(senderLogin, recipientLogin, amount, currency, amount, currency, operationId);
+                this(senderLogin, recipientLogin, amount, currency, amount, currency, operationId, notifications);
         }
 
         /**
