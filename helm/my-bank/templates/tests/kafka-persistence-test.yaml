@@ -92,19 +92,21 @@ spec:
               topic="{{ $mainTopic }}"
               dlt_topic="{{ $dltTopic }}"
 
+              # Исправлено: $4 — это CURRENT-OFFSET
               get_committed_offset() {
-                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $3} END {print sum}'
+                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $4} END {print sum}'
               }
               
               get_dlt_size() {
                 /opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$bootstrap" --topic "$dlt_topic" --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}'
               }
 
+              # Безопасное присвоение дефолтных значений для set -e
               initial_commit="$(get_committed_offset)"
-              test -z "$initial_commit" && initial_commit=0
+              initial_commit="${initial_commit:-0}"
               
               initial_dlt="$(get_dlt_size)"
-              test -z "$initial_dlt" && initial_dlt=0
+              initial_dlt="${initial_dlt:-0}"
 
               event_id="$(cat /proc/sys/kernel/random/uuid)"
               event="{\"eventId\":\"$event_id\",\"operationId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test-1\",\"message\":\"Persistence test 1\",\"occurredAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"amount\":null,\"currency\":null}"
@@ -114,8 +116,10 @@ spec:
               current_commit="$initial_commit"
               for i in $(seq 1 60); do
                 current_commit="$(get_committed_offset)"
-                test -z "$current_commit" && current_commit=0
-                test "$current_commit" -gt "$initial_commit" && break
+                current_commit="${current_commit:-0}"
+                if [ "$current_commit" -gt "$initial_commit" ]; then
+                  break
+                fi
                 sleep 1
               done
               
@@ -175,7 +179,10 @@ spec:
               topic="{{ $mainTopic }}"
               
               after_topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
-              test "$after_topic_id" = "$(cat /state/topic-id)"
+              if [ "$after_topic_id" != "$(cat /state/topic-id)" ]; then
+                echo "ERROR: Topic ID mismatch after restart!"
+                exit 1
+              fi
 
               event1_id="$(cat /state/event1-id)"
               payload1="$(cat /state/payload1)"
@@ -218,11 +225,11 @@ spec:
               dlt_topic="{{ $dltTopic }}"
 
               get_committed_offset() {
-                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $3} END {print sum}'
+                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $4} END {print sum}'
               }
               
               commit_before_event2="$(get_committed_offset)"
-              test -z "$commit_before_event2" && commit_before_event2=0
+              commit_before_event2="${commit_before_event2:-0}"
 
               event2_id="$(cat /proc/sys/kernel/random/uuid)"
               event2="{\"eventId\":\"$event2_id\",\"operationId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test-2\",\"message\":\"Persistence test 2\",\"occurredAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"amount\":null,\"currency\":null}"
@@ -232,8 +239,10 @@ spec:
               commit_after_event2="$commit_before_event2"
               for i in $(seq 1 60); do
                 commit_after_event2="$(get_committed_offset)"
-                test -z "$commit_after_event2" && commit_after_event2=0
-                test "$commit_after_event2" -gt "$commit_before_event2" && break
+                commit_after_event2="${commit_after_event2:-0}"
+                if [ "$commit_after_event2" -gt "$commit_before_event2" ]; then
+                  break
+                fi
                 sleep 1
               done
               
@@ -244,7 +253,7 @@ spec:
 
               dlt_before="$(cat /state/dlt-before)"
               dlt_after="$(/opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$bootstrap" --topic "$dlt_topic" --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}')"
-              test -z "$dlt_after" && dlt_after=0
+              dlt_after="${dlt_after:-0}"
               
               if [ "$dlt_after" -ne "$dlt_before" ]; then
                 echo "ERROR: DLT topic size increased! Valid message was discarded."
