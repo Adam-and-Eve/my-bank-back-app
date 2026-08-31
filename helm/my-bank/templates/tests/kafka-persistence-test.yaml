@@ -88,10 +88,10 @@ spec:
               unique_group="{{ $baseConsumerGroup }}-test-$RANDOM"
 
               get_partition_offset() {
-                /opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell \
+                /opt/kafka/bin/kafka-get-offsets.sh \
                   --bootstrap-server "$bootstrap" \
                   --topic "{{ $mainTopic }}" \
-                  --time -1 2>/dev/null | awk -F: '{sum += $2} END {print sum}'
+                  --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}'
               }
 
               initial_offset="$(get_partition_offset)"
@@ -193,10 +193,10 @@ spec:
               echo "$consumed_data" | grep -q "$target_event_id"
               echo "$consumed_data" | grep -q "$expected_payload"
               
-              dlt_count="$(/opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell \
+              dlt_count="$(/opt/kafka/bin/kafka-get-offsets.sh \
                 --bootstrap-server "$bootstrap" \
                 --topic "{{ $dltTopic }}" \
-                --time -1 2>/dev/null | awk -F: '{sum += $2} END {print sum}')"
+                --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}')"
               test -z "$dlt_count" || test "$dlt_count" -eq 0
 
               if kubectl get deployment {{ include "my-bank.fullname" . }}-notification-service >/dev/null 2>&1; then
