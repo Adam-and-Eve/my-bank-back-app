@@ -118,7 +118,11 @@ spec:
                 test "$current_commit" -gt "$initial_commit" && break
                 sleep 1
               done
-              test "$current_commit" -gt "$initial_commit"
+              
+              if [ "$current_commit" -le "$initial_commit" ]; then
+                echo "ERROR: Timeout waiting for notification-service to commit event 1"
+                exit 1
+              fi
 
               topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
 
@@ -157,8 +161,48 @@ spec:
             - --for=jsonpath={.status.phase}=Bound
             - pvc/{{ $kafkaName }}-data
             - --timeout=30s
+        - name: verify-kafka-state-1
+          image: "{{ $kafka.image.repository }}:{{ $kafka.image.tag }}"
+          imagePullPolicy: {{ $kafka.image.pullPolicy }}
+          volumeMounts:
+            - name: state
+              mountPath: /state
+          command:
+            - bash
+            - -ec
+            - |
+              bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
+              topic="{{ $mainTopic }}"
+              
+              after_topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
+              test "$after_topic_id" = "$(cat /state/topic-id)"
+
+              event1_id="$(cat /state/event1-id)"
+              payload1="$(cat /state/payload1)"
+              unique_reader_group="test-reader-$(cat /proc/sys/kernel/random/uuid)"
+              
+              consumed_data="$(/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server "$bootstrap" --topic "$topic" --group "$unique_reader_group" --from-beginning --timeout-ms 10000 2>/dev/null || true)"
+              
+              if ! echo "$consumed_data" | grep -q "$event1_id"; then
+                echo "ERROR: Event 1 ID missing after restart!"
+                exit 1
+              fi
+              
+              if ! echo "$consumed_data" | grep -q "$payload1"; then
+                echo "ERROR: Event 1 Payload corrupted after restart!"
+                exit 1
+              fi
+        - name: restart-notification
+          image: {{ required "helmTest.kubectlImage is required" $test.kubectlImage | quote }}
+          imagePullPolicy: {{ $test.imagePullPolicy | default "IfNotPresent" }}
+          command:
+            - bash
+            - -ec
+            - |
+              kubectl rollout restart deployment/{{ include "my-bank.fullname" . }}-notification-service
+              kubectl rollout status deployment/{{ include "my-bank.fullname" . }}-notification-service --timeout=120s
       containers:
-        - name: verify-kafka-state
+        - name: verify-kafka-state-2
           image: "{{ $kafka.image.repository }}:{{ $kafka.image.tag }}"
           imagePullPolicy: {{ $kafka.image.pullPolicy }}
           volumeMounts:
@@ -172,21 +216,6 @@ spec:
               target_group="{{ $baseConsumerGroup }}"
               topic="{{ $mainTopic }}"
               dlt_topic="{{ $dltTopic }}"
-
-              after_topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
-              test "$after_topic_id" = "$(cat /state/topic-id)"
-
-              event1_id="$(cat /state/event1-id)"
-              payload1="$(cat /state/payload1)"
-              unique_reader_group="test-reader-$(cat /proc/sys/kernel/random/uuid)"
-              
-              consumed_data="$(/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server "$bootstrap" --topic "$topic" --group "$unique_reader_group" --from-beginning --timeout-ms 10000 2>/dev/null || true)"
-              
-              echo "$consumed_data" | grep -q "$event1_id"
-              echo "$consumed_data" | grep -q "$payload1"
-
-              kubectl rollout restart deployment/{{ include "my-bank.fullname" . }}-notification-service
-              kubectl rollout status deployment/{{ include "my-bank.fullname" . }}-notification-service --timeout=120s
 
               get_committed_offset() {
                 /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $3} END {print sum}'
@@ -207,10 +236,18 @@ spec:
                 test "$commit_after_event2" -gt "$commit_before_event2" && break
                 sleep 1
               done
-              test "$commit_after_event2" -gt "$commit_before_event2"
+              
+              if [ "$commit_after_event2" -le "$commit_before_event2" ]; then
+                echo "ERROR: Timeout waiting for notification-service to commit event 2"
+                exit 1
+              fi
 
               dlt_before="$(cat /state/dlt-before)"
               dlt_after="$(/opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$bootstrap" --topic "$dlt_topic" --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}')"
               test -z "$dlt_after" && dlt_after=0
-              test "$dlt_after" -eq "$dlt_before"
+              
+              if [ "$dlt_after" -ne "$dlt_before" ]; then
+                echo "ERROR: DLT topic size increased! Valid message was discarded."
+                exit 1
+              fi
   {{- end }}
