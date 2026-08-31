@@ -1,14 +1,14 @@
 {{- $test := .Values.helmTest | default dict -}}
   {{- if ($test.enabled | default true) }}
-  {{- $kafka := index .Values "kafka" -}}
-  {{- $account := index .Values "account-service" -}}
-  {{- $notification := index .Values "notification-service" -}}
+  {{- $kafka := index .Values "kafka" | default dict -}}
+  {{- $account := index .Values "account-service" | default dict -}}
+  {{- $notification := index .Values "notification-service" | default dict -}}
   {{- $globalEnv := default dict .Values.global.env -}}
   {{- $accountEnv := mergeOverwrite (deepCopy $globalEnv) (default dict $account.env) -}}
   {{- $notificationEnv := mergeOverwrite (deepCopy $globalEnv) (default dict $notification.env) -}}
   {{- $kafkaName := default "kafka" $kafka.fullnameOverride -}}
-  {{- $mainTopic := required "BANK_KAFKA_NOTIFICATION_TOPIC is required" (get $accountEnv "BANK_KAFKA_NOTIFICATION_TOPIC") -}}
-  {{- $consumerGroup := required "notification-service.env.SPRING_KAFKA_CONSUMER_GROUP_ID is required" (get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID") -}}
+  {{- $mainTopic := get $accountEnv "BANK_KAFKA_NOTIFICATION_TOPIC" | default "bank.notification" -}}
+  {{- $consumerGroup := get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID" | default "bank-notification" -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -106,7 +106,7 @@ spec:
               event_id="$(cat /proc/sys/kernel/random/uuid)"
               operation_id="$(cat /proc/sys/kernel/random/uuid)"
               occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              event="{\"eventId\":\"$event_id\",\"operationId\":\"$operation_id\",\"source\":\"ACCOUNTS\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test\",\"message\":\"Helm persistence test\",\"occurredAt\":\"$occurred_at\",\"amount\":null,\"currency\":null}"
+              event="{\"eventId\":\"$event_id\",\"operationId\":\"$operation_id\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test\",\"message\":\"Helm persistence test\",\"occurredAt\":\"$occurred_at\",\"amount\":null,\"currency\":null}"
               printf 'helm-persistence-test|%s\n' "$event" |
                 /opt/kafka/bin/kafka-console-producer.sh \
                   --bootstrap-server "$bootstrap" \
