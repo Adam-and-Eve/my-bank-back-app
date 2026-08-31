@@ -44,12 +44,12 @@ bank:
       max-attempts: ${BANK_BALANCE_RETRY_MAX_ATTEMPTS:3}
       backoff-ms: ${BANK_BALANCE_RETRY_BACKOFF_MS:50}
   kafka:
-    notification-dlt-topic: ${BANK_KAFKA_NOTIFICATION_DLT_TOPIC:bank.notification.dlt}
+    notification-dlt-topic: ${BANK_KAFKA_NOTIFICATION_DLT_TOPIC:my.bank.notification.dlt}
     notification-dlt-partitions: ${BANK_KAFKA_NOTIFICATION_DLT_PARTITIONS:3}
     notification-dlt-retention-ms: ${BANK_KAFKA_NOTIFICATION_DLT_RETENTION_MS:604800000}
     notification-partitions: ${BANK_KAFKA_NOTIFICATION_PARTITIONS:3}
     notification-replication-factor: ${BANK_KAFKA_NOTIFICATION_REPLICATION_FACTOR:1}
-    notification-topic: ${BANK_KAFKA_NOTIFICATION_TOPIC:bank.notification}
+    notification-topic: ${BANK_KAFKA_NOTIFICATION_TOPIC:my.bank.notification}
 
 jdbc:
   datasource-proxy:

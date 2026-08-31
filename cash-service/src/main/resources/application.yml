@@ -47,12 +47,12 @@ bank:
       max-attempts: ${BANK_HTTP_CLIENT_RETRY_MAX_ATTEMPTS:2}
       backoff: ${BANK_HTTP_CLIENT_RETRY_BACKOFF:100ms}
   kafka:
-    notification-dlt-topic: ${BANK_KAFKA_NOTIFICATION_DLT_TOPIC:bank.notification.dlt}
+    notification-dlt-topic: ${BANK_KAFKA_NOTIFICATION_DLT_TOPIC:my.bank.notification.dlt}
     notification-dlt-partitions: ${BANK_KAFKA_NOTIFICATION_DLT_PARTITIONS:3}
     notification-dlt-retention-ms: ${BANK_KAFKA_NOTIFICATION_DLT_RETENTION_MS:604800000}
     notification-partitions: ${BANK_KAFKA_NOTIFICATION_PARTITIONS:3}
     notification-replication-factor: ${BANK_KAFKA_NOTIFICATION_REPLICATION_FACTOR:1}
-    notification-topic: ${BANK_KAFKA_NOTIFICATION_TOPIC:bank.notification}
+    notification-topic: ${BANK_KAFKA_NOTIFICATION_TOPIC:my.bank.notification}
   services:
     account-service:
       base-url: ${BANK_SERVICES_ACCOUNT_SERVICE_BASE_URL:http://account-service:8081}
