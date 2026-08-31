@@ -8,7 +8,8 @@
   {{- $notificationEnv := mergeOverwrite (deepCopy $globalEnv) (default dict $notification.env) -}}
   {{- $kafkaName := default "kafka" $kafka.fullnameOverride -}}
   {{- $mainTopic := required "BANK_KAFKA_NOTIFICATION_TOPIC is required" (get $accountEnv "BANK_KAFKA_NOTIFICATION_TOPIC") -}}
-  {{- $consumerGroup := required "notification-service.env.SPRING_KAFKA_CONSUMER_GROUP_ID is required" (get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID") -}}
+  {{- $dltTopic := default "bank.notification.dlt" (get $accountEnv "BANK_KAFKA_NOTIFICATION_DLT_TOPIC") -}}
+  {{- $baseConsumerGroup := required "notification-service.env.SPRING_KAFKA_CONSUMER_GROUP_ID is required" (get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID") -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -84,29 +85,24 @@ spec:
             - -ec
             - |
               bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
+              unique_group="{{ $baseConsumerGroup }}-test-$RANDOM"
 
-              topic_id() {
-                /opt/kafka/bin/kafka-topics.sh \
+              get_partition_offset() {
+                /opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell \
                   --bootstrap-server "$bootstrap" \
-                  --describe \
-                  --topic "{{ $mainTopic }}" |
-                  sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' |
-                  head -n 1
+                  --topic "{{ $mainTopic }}" \
+                  --time -1 2>/dev/null | awk -F: '{sum += $2} END {print sum}'
               }
 
-              group_offsets() {
-                /opt/kafka/bin/kafka-consumer-groups.sh \
-                  --bootstrap-server "$bootstrap" \
-                  --describe \
-                  --group "{{ $consumerGroup }}" 2>/dev/null |
-                  awk '$2 == "{{ $mainTopic }}" {print $3 ":" $4}' |
-                  sort
-              }
+              initial_offset="$(get_partition_offset)"
+              test -z "$initial_offset" && initial_offset=0
 
               event_id="$(cat /proc/sys/kernel/random/uuid)"
               operation_id="$(cat /proc/sys/kernel/random/uuid)"
               occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              event="{\"eventId\":\"$event_id\",\"operationId\":\"$operation_id\",\"source\":\"ACCOUNTS\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test\",\"message\":\"Helm persistence test\",\"occurredAt\":\"$occurred_at\",\"amount\":null,\"currency\":null}"
+              
+              event="{\"eventId\":\"$event_id\",\"operationId\":\"$operation_id\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test\",\"message\":\"Helm persistence test\",\"occurredAt\":\"$occurred_at\",\"amount\":null,\"currency\":null}"
+              
               printf 'helm-persistence-test|%s\n' "$event" |
                 /opt/kafka/bin/kafka-console-producer.sh \
                   --bootstrap-server "$bootstrap" \
@@ -114,17 +110,25 @@ spec:
                   --property parse.key=true \
                   --property key.separator='|'
 
-              before_offsets=""
-              for attempt in $(seq 1 60); do
-                before_offsets="$(group_offsets)"
-                test -n "$before_offsets" && break
+              current_offset="$initial_offset"
+              for attempt in $(seq 1 30); do
+                current_offset="$(get_partition_offset)"
+                test "$current_offset" -gt "$initial_offset" && break
                 sleep 1
               done
-              test -n "$before_offsets"
-              before_topic_id="$(topic_id)"
-              test -n "$before_topic_id"
-              printf '%s\n' "$before_topic_id" > /state/topic-id
-              printf '%s\n' "$before_offsets" > /state/offsets
+              test "$current_offset" -gt "$initial_offset"
+
+              topic_id="$(/opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server "$bootstrap" \
+                --describe \
+                --topic "{{ $mainTopic }}" |
+                sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' |
+                head -n 1)"
+              test -n "$topic_id"
+
+              printf '%s\n' "$topic_id" > /state/topic-id
+              printf '%s\n' "$event_id" > /state/event-id
+              printf '%s\n' "$event" > /state/payload
         - name: delete-kafka
           image: {{ required "helmTest.kubectlImage is required" $test.kubectlImage | quote }}
           imagePullPolicy: {{ $test.imagePullPolicy | default "IfNotPresent" }}
@@ -168,6 +172,8 @@ spec:
             - -ec
             - |
               bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
+              target_event_id="$(cat /state/event-id)"
+              expected_payload="$(cat /state/payload)"
 
               after_topic_id="$(/opt/kafka/bin/kafka-topics.sh \
                 --bootstrap-server "$bootstrap" \
@@ -175,13 +181,26 @@ spec:
                 --topic "{{ $mainTopic }}" |
                 sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' |
                 head -n 1)"
-              after_offsets="$(/opt/kafka/bin/kafka-consumer-groups.sh \
-                --bootstrap-server "$bootstrap" \
-                --describe \
-                --group "{{ $consumerGroup }}" 2>/dev/null |
-                awk '$2 == "{{ $mainTopic }}" {print $3 ":" $4}' |
-                sort)"
-
               test "$after_topic_id" = "$(cat /state/topic-id)"
-              test "$after_offsets" = "$(cat /state/offsets)"
+
+              consumed_data="$(/opt/kafka/bin/kafka-console-consumer.sh \
+                --bootstrap-server "$bootstrap" \
+                --topic "{{ $mainTopic }}" \
+                --from-beginning \
+                --max-messages 1 \
+                --timeout-ms 10000)"
+              
+              echo "$consumed_data" | grep -q "$target_event_id"
+              echo "$consumed_data" | grep -q "$expected_payload"
+              
+              dlt_count="$(/opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell \
+                --bootstrap-server "$bootstrap" \
+                --topic "{{ $dltTopic }}" \
+                --time -1 2>/dev/null | awk -F: '{sum += $2} END {print sum}')"
+              test -z "$dlt_count" || test "$dlt_count" -eq 0
+
+              if kubectl get deployment {{ include "my-bank.fullname" . }}-notification-service >/dev/null 2>&1; then
+                kubectl rollout restart deployment/{{ include "my-bank.fullname" . }}-notification-service
+                kubectl rollout status deployment/{{ include "my-bank.fullname" . }}-notification-service --timeout=120s
+              fi
   {{- end }}
