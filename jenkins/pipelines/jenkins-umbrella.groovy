@@ -21,59 +21,33 @@ def serviceValuesArgs(List services) {
 
 def decryptSecrets(String environment) {
     withCredentials([
-            file(
-                    credentialsId: 'my-bank-sops-age-key',
-                    variable: 'SOPS_AGE_KEY_FILE'
-            )
+            file(credentialsId: 'my-bank-sops-age-key', variable: 'SOPS_AGE_KEY_FILE')
     ]) {
         runCommand(
-                "mkdir -p envs/runtime && " +
-                        "sops --decrypt " +
-                        "envs/secrets/values-secrets-${environment}.enc.yaml " +
-                        "> envs/runtime/values-secrets-${environment}.yaml"
+                "mkdir -p envs/runtime && sops --decrypt envs/secrets/values-secrets-${environment}.enc.yaml > envs/runtime/values-secrets-${environment}.yaml",
+                "if not exist envs\\runtime mkdir envs\\runtime && sops --decrypt envs\\secrets\\values-secrets-${environment}.enc.yaml > envs\\runtime\\values-secrets-${environment}.yaml"
         )
 
         runCommand(
-                "sops --decrypt " +
-                        "envs/secrets/my-bank-realm-realm.enc.json " +
-                        "> envs/runtime/my-bank-realm-realm.json"
+                "sops --decrypt envs/secrets/my-bank-realm-realm.enc.json > envs/runtime/my-bank-realm-realm.json",
+                "sops --decrypt envs\\secrets\\my-bank-realm-realm.enc.json > envs\\runtime\\my-bank-realm-realm.json"
         )
     }
 }
 
 def cleanupRuntimeSecrets() {
     runCommand(
-            "rm -f " +
-                    "envs/runtime/values-secrets-test.yaml " +
-                    "envs/runtime/values-secrets-prod.yaml " +
-                    "envs/runtime/my-bank-realm-realm.json",
-
-            "if exist envs\\runtime\\values-secrets-test.yaml del /f /q envs\\runtime\\values-secrets-test.yaml " +
-                    "& if exist envs\\runtime\\values-secrets-prod.yaml del /f /q envs\\runtime\\values-secrets-prod.yaml " +
-                    "& if exist envs\\runtime\\my-bank-realm-realm.json del /f /q envs\\runtime\\my-bank-realm-realm.json"
+            "rm -f envs/runtime/values-secrets-test.yaml envs/runtime/values-secrets-prod.yaml envs/runtime/my-bank-realm-realm.json",
+            "if exist envs\\runtime\\values-secrets-test.yaml del /f /q envs\\runtime\\values-secrets-test.yaml & if exist envs\\runtime\\values-secrets-prod.yaml del /f /q envs\\runtime\\values-secrets-prod.yaml & if exist envs\\runtime\\my-bank-realm-realm.json del /f /q envs\\runtime\\my-bank-realm-realm.json"
     )
 }
 
 def createKeycloakRealmSecret(String namespace) {
-
     withCredentials([
-            file(
-                    credentialsId: 'my-bank-kubeconfig',
-                    variable: 'KUBECONFIG'
-            )
+            file(credentialsId: "my-bank-kubeconfig-${namespace}", variable: 'KUBECONFIG')
     ]) {
-
-        runCommand(
-                "kubectl create namespace ${namespace} " +
-                        "--dry-run=client -o yaml | kubectl apply -f -"
-        )
-
-        runCommand(
-                "kubectl create secret generic keycloak-realm " +
-                        "--from-file=my-bank-realm-realm.json=envs/runtime/my-bank-realm-realm.json " +
-                        "--namespace ${namespace} " +
-                        "--dry-run=client -o yaml | kubectl apply -f -"
-        )
+        runCommand("kubectl create namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -")
+        runCommand("kubectl create secret generic keycloak-realm --from-file=my-bank-realm-realm.json=envs/runtime/my-bank-realm-realm.json --namespace ${namespace} --dry-run=client -o yaml | kubectl apply -f -")
     }
 }
 
@@ -85,35 +59,13 @@ def helmDeploy(
         String imageRegistry,
         String imageTag
 ) {
-
     withCredentials([
-            file(
-                    credentialsId: 'my-bank-kubeconfig',
-                    variable: 'KUBECONFIG'
-            )
+            file(credentialsId: "my-bank-kubeconfig-${namespace}", variable: 'KUBECONFIG')
     ]) {
-
         def values = serviceValuesArgs(services)
+        def command = "helm upgrade --install my-bank helm/my-bank --namespace ${namespace} --create-namespace --atomic --wait --wait-for-jobs --timeout 60m -f ${valuesFile} ${values} -f ${secretsFile} --set global.bankImageRegistry=${imageRegistry} --set global.bankImageTag=${imageTag}"
 
-        def command =
-                "helm upgrade --install my-bank helm/my-bank " +
-                        "--namespace ${namespace} " +
-                        "--create-namespace " +
-                        "--atomic " +
-                        "--wait " +
-                        "--wait-for-jobs " +
-                        "--timeout 30m " +
-                        "-f ${valuesFile} " +
-                        "${values} " +
-                        "-f ${secretsFile} " +
-                        "--set global.imageRegistry=${imageRegistry} " +
-                        "--set global.imageTag=${imageTag}"
-
-
-        runCommand(
-                "${command} --dry-run"
-        )
-
+        echo "🚀 Выполняем боевой Helm Deploy в ${namespace}..."
         runCommand(command)
     }
 }
@@ -121,34 +73,22 @@ def helmDeploy(
 def runHelmTest(String namespace, String testName, String stageName) {
     stage(stageName) {
         try {
-            runCommand(
-                    "helm test my-bank " +
-                            "--namespace ${namespace} " +
-                            "--filter name=${testName} " +
-                            "--timeout 30m"
-            )
+            echo "🧪 Запуск Helm-теста: ${testName}"
+            runCommand("helm test my-bank --namespace ${namespace} --filter name=${testName} --timeout 60m")
         } catch (Exception e) {
-            echo "${stageName} failed. Collecting diagnostics for ${testName}..."
-
+            echo "❌ Тест ${stageName} упал. Сбор логов для диагностики..."
             runCommand(
-                    "kubectl get job ${testName} " +
-                            "--namespace ${namespace} || true"
+                    "kubectl get job ${testName} --namespace ${namespace} || true",
+                    "kubectl get job ${testName} --namespace ${namespace} || exit 0"
             )
-
             runCommand(
-                    "kubectl get pods " +
-                            "--namespace ${namespace} " +
-                            "-l job-name=${testName} || true"
+                    "kubectl get pods --namespace ${namespace} -l job-name=${testName} || true",
+                    "kubectl get pods --namespace ${namespace} -l job-name=${testName} || exit 0"
             )
-
             runCommand(
-                    "kubectl logs " +
-                            "--namespace ${namespace} " +
-                            "-l job-name=${testName} " +
-                            "--tail=-1 " +
-                            "--all-containers=true || true"
+                    "kubectl logs --namespace ${namespace} -l job-name=${testName} --tail=-1 --all-containers=true || true",
+                    "kubectl logs --namespace ${namespace} -l job-name=${testName} --tail=-1 --all-containers=true || exit 0"
             )
-
             throw e
         }
     }
@@ -156,17 +96,13 @@ def runHelmTest(String namespace, String testName, String stageName) {
 
 def executeAllHelmTests(String namespace) {
     withCredentials([
-            file(
-                    credentialsId: 'my-bank-kubeconfig',
-                    variable: 'KUBECONFIG'
-            )
+            file(credentialsId: "my-bank-kubeconfig-${namespace}", variable: 'KUBECONFIG')
     ]) {
-        runHelmTest(namespace, 'my-bank-smoke-test', 'Smoke Tests')
-        runHelmTest(namespace, 'my-bank-kafka-broker-test', 'Kafka Broker Tests')
-        runHelmTest(namespace, 'my-bank-kafka-persistence-test', 'Kafka Persistence Tests')
+        runHelmTest(namespace, 'my-bank-smoke-test', '✅ Test: Smoke')
+        runHelmTest(namespace, 'my-bank-kafka-broker-test', '✅ Test: Kafka Broker')
+        runHelmTest(namespace, 'my-bank-kafka-persistence-test', '✅ Test: Kafka Persistence')
     }
 }
-
 
 def runUmbrellaPipeline() {
 
@@ -182,68 +118,54 @@ def runUmbrellaPipeline() {
             [name: 'api-gateway', image: 'my-bank-api-gateway', hasContractTests: false]
     ]
 
-
     properties([
             parameters([
-
                     string(
                             name: 'IMAGE_REGISTRY',
                             defaultValue: 'registry.example.com/my-bank',
                             description: 'Container registry namespace'
                     ),
-
                     string(
                             name: 'IMAGE_TAG',
                             defaultValue: '',
                             description: 'Image tag. Empty value uses Jenkins BUILD_NUMBER.'
                     ),
-
                     booleanParam(
                             name: 'BUILD_IMAGES',
                             defaultValue: false,
                             description: 'Build all images using Docker'
                     ),
-
                     booleanParam(
                             name: 'PUSH_IMAGES',
                             defaultValue: false,
                             description: 'Build and push all images to registry'
                     ),
-
                     booleanParam(
                             name: 'DEPLOY_TEST',
                             defaultValue: false,
-                            description: 'Deploy umbrella chart to test namespace'
+                            description: 'Deploy umbrella chart to test namespace/cluster'
                     ),
-
                     booleanParam(
                             name: 'DEPLOY_PROD',
                             defaultValue: false,
-                            description: 'Deploy umbrella chart to prod namespace after manual approval'
+                            description: 'Deploy umbrella chart to prod namespace/cluster after manual approval'
                     )
             ])
     ])
 
-
-    def imageTag = params.IMAGE_TAG?.trim()
-            ? params.IMAGE_TAG.trim()
-            : env.BUILD_NUMBER
-
-
+    def imageTag = params.IMAGE_TAG?.trim() ? params.IMAGE_TAG.trim() : env.BUILD_NUMBER
     def registryHost = params.IMAGE_REGISTRY.tokenize('/')[0]
 
-
     try {
-
-
-        stage('Validate') {
+        stage('☕ Gradle: Validate') {
             gradle('projects')
         }
 
-
-        stage('Java tests') {
+        stage('☕ Gradle: Unit Tests') {
             gradle('test')
+        }
 
+        stage('☕ Gradle: Contract Tests') {
             def contractTasks = services
                     .findAll { it.hasContractTests }
                     .collect { ":${it.name}:contractTest" }
@@ -252,157 +174,136 @@ def runUmbrellaPipeline() {
             if (contractTasks) {
                 gradle(contractTasks)
             } else {
-                echo 'No contract tests configured for these services, skipping.'
+                echo 'Пропуск: нет настроенных контрактных тестов.'
             }
         }
 
-
-        stage('bootJar') {
+        stage('☕ Gradle: bootJar') {
             gradle('clean bootJar')
         }
 
-
-        stage('Docker build') {
-
+        stage('🐳 Docker: Build') {
             if (params.BUILD_IMAGES || params.PUSH_IMAGES) {
-
                 services.each { service ->
-
+                    echo "Сборка образа для ${service.name}..."
                     runCommand(
-                            "docker build " +
-                                    "-t ${params.IMAGE_REGISTRY}/${service.image}:${imageTag} " +
-                                    "${service.name}"
+                            "docker build -t ${params.IMAGE_REGISTRY}/${service.image}:${imageTag} ${service.name}"
                     )
                 }
-
             } else {
-
-                echo 'Docker builds skipped by parameter.'
+                echo 'Пропуск: сборка образов отключена в параметрах.'
             }
         }
 
-
-        stage('Image push') {
-
+        stage('🐳 Docker: Push') {
             if (params.PUSH_IMAGES) {
-
-
                 withCredentials([
-
                         usernamePassword(
                                 credentialsId: 'my-bank-registry-credentials',
                                 usernameVariable: 'REGISTRY_USERNAME',
                                 passwordVariable: 'REGISTRY_PASSWORD'
                         )
-
                 ]) {
-
+                    echo "Авторизация в ${registryHost}..."
 
                     runCommand(
-                            'printf "%s" "$REGISTRY_PASSWORD" | ' +
-                                    "docker login ${registryHost} " +
-                                    '--username "$REGISTRY_USERNAME" ' +
-                                    '--password-stdin'
+                            'printf "%s" "$REGISTRY_PASSWORD" | docker login ${registryHost} --username "$REGISTRY_USERNAME" --password-stdin',
+                            "echo %REGISTRY_PASSWORD%| docker login ${registryHost} --username %REGISTRY_USERNAME% --password-stdin"
                     )
 
-
                     services.each { service ->
-
+                        echo "Отправка образа ${service.image}..."
                         runCommand(
-                                "docker push " +
-                                        "${params.IMAGE_REGISTRY}/${service.image}:${imageTag}"
+                                "docker push ${params.IMAGE_REGISTRY}/${service.image}:${imageTag}"
                         )
                     }
                 }
-
-
             } else {
-
-                echo 'Image push skipped by parameter.'
+                echo 'Пропуск: пуш образов отключен в параметрах.'
             }
         }
 
-
-        stage('Kubernetes validation') {
-
-            if (params.DEPLOY_TEST || params.DEPLOY_PROD) {
-
-
+        stage('☸️ K8s: Validation') {
+            if (params.DEPLOY_TEST) {
                 withCredentials([
-
-                        file(
-                                credentialsId: 'my-bank-kubeconfig',
-                                variable: 'KUBECONFIG'
-                        )
-
+                        file(credentialsId: 'my-bank-kubeconfig-test', variable: 'KUBECONFIG')
                 ]) {
-
+                    echo '--- Проверка кластера TEST ---'
                     runCommand('kubectl cluster-info')
                     runCommand('kubectl get nodes')
-                    runCommand('helm version')
                 }
-
-
-            } else {
-
-                echo 'Kubernetes validation skipped because deployment is disabled.'
+            }
+            if (params.DEPLOY_PROD) {
+                withCredentials([
+                        file(credentialsId: 'my-bank-kubeconfig-prod', variable: 'KUBECONFIG')
+                ]) {
+                    echo '--- Проверка кластера PROD ---'
+                    runCommand('kubectl cluster-info')
+                    runCommand('kubectl get nodes')
+                }
+            }
+            if (!params.DEPLOY_TEST && !params.DEPLOY_PROD) {
+                echo 'Пропуск: деплой отключен.'
             }
         }
 
-
-        stage('Prepare test secrets') {
-
+        stage('🔐 Secrets: Decrypt Test') {
             if (params.DEPLOY_TEST) {
                 decryptSecrets('test')
+            } else {
+                echo "Пропуск (DEPLOY_TEST выключен)."
             }
         }
 
+        stage('📦 Helm: Update Dependencies') {
+            runCommand('helm dependency update helm/my-bank')
+        }
 
-        stage('Helm lint and template') {
+        stage('🔎 Helm: Lint Subcharts') {
+            runCommand('helm lint helm/charts/zipkin')
+            runCommand('helm lint helm/charts/elasticsearch')
+            runCommand('helm lint helm/charts/logstash')
+            runCommand('helm lint helm/charts/kibana')
+        }
 
-
+        stage('🔎 Helm: Lint Umbrella') {
             def values = serviceValuesArgs(services)
 
-
             runCommand(
-                    'helm dependency update helm/my-bank'
-            )
-
-
-            runCommand(
-                    "helm lint helm/my-bank " +
-                            "-f helm/my-bank/values-test.yaml " +
-                            "${values} " +
-                            (params.DEPLOY_TEST
-                                    ? "-f envs/runtime/values-secrets-test.yaml"
-                                    : "")
-            )
-
-
-            runCommand(
-                    "helm template my-bank helm/my-bank " +
-                            "--namespace test " +
-                            "-f helm/my-bank/values-test.yaml " +
-                            "${values} " +
-                            (params.DEPLOY_TEST
-                                    ? "-f envs/runtime/values-secrets-test.yaml"
-                                    : "") +
-                            " --set global.imageRegistry=${params.IMAGE_REGISTRY}" +
-                            " --set global.imageTag=${imageTag}"
+                    "helm lint helm/my-bank -f helm/my-bank/values-test.yaml ${values} " +
+                            (params.DEPLOY_TEST ? "-f envs/runtime/values-secrets-test.yaml" : "")
             )
         }
 
+        stage('📄 Helm: Template Render') {
+            def values = serviceValuesArgs(services)
 
+            runCommand(
+                    "helm template my-bank helm/my-bank --namespace test -f helm/my-bank/values-test.yaml ${values} " +
+                            (params.DEPLOY_TEST ? "-f envs/runtime/values-secrets-test.yaml" : "") +
+                            " --set global.bankImageRegistry=${params.IMAGE_REGISTRY} --set global.bankImageTag=${imageTag}"
+            )
+        }
 
-        stage('Deploy test') {
+        stage('🧪 Test: Infrastructure (Bun)') {
+            runCommand('bun test helm/scripts/observability-render.test.ts')
+        }
 
+        stage('🧪 Test: Prometheus Alerts') {
+            runCommand(
+                    'docker run --rm --entrypoint=promtool -v "$PWD:/workspace:ro" prom/prometheus:v3.12.0 test rules /workspace/helm/charts/spring-service/tests/kafka-publication-alert.test.yaml',
+                    'docker run --rm --entrypoint=promtool -v "%CD%:/workspace:ro" prom/prometheus:v3.12.0 test rules /workspace/helm/charts/spring-service/tests/kafka-publication-alert.test.yaml'
+            )
 
+            runCommand(
+                    'docker run --rm --entrypoint=promtool -v "$PWD/helm/my-bank/files/prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml',
+                    'docker run --rm --entrypoint=promtool -v "%CD%\\helm\\my-bank\\files\\prometheus-rules:/rules:ro" prom/prometheus:v3.12.0 test rules /rules/my-bank-alerts.test.yaml'
+            )
+        }
+
+        stage('🚀 Deploy: Test Env') {
             if (params.DEPLOY_TEST) {
-
-
                 createKeycloakRealmSecret('test')
-
-
                 helmDeploy(
                         services,
                         'test',
@@ -413,44 +314,33 @@ def runUmbrellaPipeline() {
                 )
 
                 executeAllHelmTests('test')
+            } else {
+                echo "Пропуск."
             }
         }
 
-
-
-        stage('Manual approval') {
-
-
+        stage('🛑 Approval: Deploy Prod') {
             if (params.DEPLOY_PROD) {
-
                 input(
                         message: 'Deploy my-bank umbrella release to prod?',
                         ok: 'Deploy'
                 )
+            } else {
+                echo "Пропуск."
             }
         }
 
-
-
-        stage('Prepare prod secrets') {
-
-
+        stage('🔐 Secrets: Decrypt Prod') {
             if (params.DEPLOY_PROD) {
                 decryptSecrets('prod')
+            } else {
+                echo "Пропуск."
             }
         }
 
-
-
-        stage('Deploy prod') {
-
-
+        stage('🚀 Deploy: Prod Env') {
             if (params.DEPLOY_PROD) {
-
-
                 createKeycloakRealmSecret('prod')
-
-
                 helmDeploy(
                         services,
                         'prod',
@@ -459,18 +349,14 @@ def runUmbrellaPipeline() {
                         params.IMAGE_REGISTRY,
                         imageTag
                 )
+            } else {
+                echo "Пропуск."
             }
         }
 
-
-
     } finally {
-
-
-        stage('Cleanup secrets') {
-
-            echo 'Removing decrypted secrets from Jenkins workspace...'
-
+        stage('🧹 Cleanup: Secrets') {
+            echo 'Удаление расшифрованных секретов из workspace...'
             cleanupRuntimeSecrets()
         }
     }

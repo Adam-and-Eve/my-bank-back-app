@@ -9,6 +9,12 @@ front-ui-service:
   service:
     port: 8085
 
+  management:
+    enabled: true
+    port: 8095
+  probes:
+    port: management
+
   env:
     BANK_PUBLIC_BASE_URL: http://localhost:8080
     BANK_SERVICES_ACCOUNT_SERVICE_BASE_URL: http://account-service:8081
@@ -19,6 +25,7 @@ front-ui-service:
     BANK_KEYCLOAK_END_SESSION_URI: http://localhost:8080/realms/my-bank-realm/protocol/openid-connect/logout
     BANK_KEYCLOAK_REDIRECT_URI: http://localhost:8080/login/oauth2/code/{registrationId}
     BANK_KEYCLOAK_USER_INFO_URI: http://keycloak:8080/realms/my-bank-realm/protocol/openid-connect/userinfo
+    MANAGEMENT_SERVER_PORT: "8095"
     SERVER_PORT: "8085"
 
   secretEnv:

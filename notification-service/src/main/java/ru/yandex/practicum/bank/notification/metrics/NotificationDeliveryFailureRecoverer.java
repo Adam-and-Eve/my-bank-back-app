@@ -21,7 +21,7 @@ public class NotificationDeliveryFailureRecoverer implements ConsumerRecordRecov
 
     // region Constants
 
-    static final String METRIC_NAME = "bank.notification.delivery.failures";
+    static final String METRIC_NAME = "my.bank.notification.delivery.failures";
     private static final String UNKNOWN_RECIPIENT = "unknown";
 
     // endregion

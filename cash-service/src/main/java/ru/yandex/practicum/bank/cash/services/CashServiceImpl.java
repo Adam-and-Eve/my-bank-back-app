@@ -13,13 +13,14 @@ import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
 import ru.yandex.practicum.bank.cash.mappers.AccountBalanceMapper;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationRequestViewModel;
 import ru.yandex.practicum.bank.cash.viewmodels.CashOperationResponseViewModel;
-import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.*;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -38,7 +39,6 @@ public class CashServiceImpl implements CashService {
     private final AccountClient accountClient;
     private final BlockerClient blockerClient;
     private final ExchangeClient exchangeClient;
-    private final NotificationEventPublisher notificationEventPublisher;
     private final AccountBalanceMapper accountBalanceMapper;
     private final Clock clock;
 
@@ -55,20 +55,17 @@ public class CashServiceImpl implements CashService {
      * @param accountClient Клиент для взаимодействия с сервисом счетов.
      * @param blockerClient Клиент для проверки операций на блокировку.
      * @param exchangeClient Клиент для получения курсов обмена валют.
-     * @param notificationEventPublisher Паблишер для асинхронной публикации событий уведомлений.
      * @param accountBalanceMapper Маппер для преобразования моделей запросов.
      * @param clock Источник времени.
      */
     public CashServiceImpl(AccountClient accountClient,
                            BlockerClient blockerClient,
                            ExchangeClient exchangeClient,
-                           NotificationEventPublisher notificationEventPublisher,
                            AccountBalanceMapper accountBalanceMapper,
                            Clock clock) {
         this.accountClient = accountClient;
         this.blockerClient = blockerClient;
         this.exchangeClient = exchangeClient;
-        this.notificationEventPublisher = notificationEventPublisher;
         this.accountBalanceMapper = accountBalanceMapper;
         this.clock = clock;
     }
@@ -92,13 +89,13 @@ public class CashServiceImpl implements CashService {
             String login,
             CashOperationRequestViewModel request,
             UUID operationId) {
-        validateAmount(request.amount(), operationId, OperationTypeEnumModel.DEPOSIT, request.currency());
+        validateAmount(request.amount(), operationId, OperationTypeEnumModel.DEPOSIT, request.currency(), login);
 
         checkOperation(login, request, operationId, OperationTypeEnumModel.DEPOSIT);
 
-        var balance = accountClient.deposit(accountBalanceMapper.toAccountsRequest(login, request, operationId));
+        var notifications = buildNotifications(login, request, operationId, NotificationTypeEnumModel.CASH_DEPOSITED);
 
-        publishNotification(login, request, operationId, NotificationTypeEnumModel.CASH_DEPOSITED);
+        var balance = accountClient.deposit(accountBalanceMapper.toAccountsRequest(login, request, operationId, notifications));
 
         log.info(
                 "Cash operation completed operationId={} operationType=DEPOSIT currency={} status=success source=cash-service targetService=accounts-service",
@@ -124,13 +121,13 @@ public class CashServiceImpl implements CashService {
             String login,
             CashOperationRequestViewModel request,
             UUID operationId) {
-        validateAmount(request.amount(), operationId, OperationTypeEnumModel.WITHDRAW, request.currency());
+        validateAmount(request.amount(), operationId, OperationTypeEnumModel.WITHDRAW, request.currency(), login);
 
         checkOperation(login, request, operationId, OperationTypeEnumModel.WITHDRAW);
 
-        var balance = accountClient.withdraw(accountBalanceMapper.toAccountsRequest(login, request, operationId));
+        var notifications = buildNotifications(login, request, operationId, NotificationTypeEnumModel.CASH_WITHDRAWN);
 
-        publishNotification(login, request, operationId, NotificationTypeEnumModel.CASH_WITHDRAWN);
+        var balance = accountClient.withdraw(accountBalanceMapper.toAccountsRequest(login, request, operationId, notifications));
 
         log.info(
                 "Cash operation completed operationId={} operationType=WITHDRAW currency={} status=success source=cash-service targetService=accounts-service",
@@ -154,7 +151,8 @@ public class CashServiceImpl implements CashService {
     private void validateAmount(BigDecimal amount,
                                 UUID operationId,
                                 OperationTypeEnumModel operationType,
-                                CurrencyEnumModel currency) {
+                                CurrencyEnumModel currency,
+                                String login) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             log.warn(
                     "Cash operation rejected operationId={} operationType={} currency={} status=rejected errorCode=INVALID_AMOUNT source=cash-service",
@@ -256,26 +254,26 @@ public class CashServiceImpl implements CashService {
 
     /**
      * <summary>
-     * Формирует и публикует событие уведомления о результатах кассовой операции
-     * в брокер сообщений для последующей отправки пользователю.
+     * Формирует список событий уведомления о результатах кассовой операции
+     * для последующего атомарного сохранения в Outbox сервиса счетов.
      * </summary>
-     * @param login Логин пользователя (получатель уведомления).
-     * @param request Детали исходного запроса (для извлечения суммы и валюты).
-     * @param operationId Уникальный идентификатор операции.
-     * @param type Тип уведомления (CASH_DEPOSITED или CASH_WITHDRAWN).
      */
-    private void publishNotification(
+    private List<NotificationEventModel> buildNotifications(
             String login,
             CashOperationRequestViewModel request,
             UUID operationId,
             NotificationTypeEnumModel type
     ) {
-        String message = type == NotificationTypeEnumModel.CASH_DEPOSITED
+        var message = type == NotificationTypeEnumModel.CASH_DEPOSITED
                 ? "Счёт пополнен на " + request.amount() + " " + request.currency()
                 : "Со счёта снято " + request.amount() + " " + request.currency();
 
-        notificationEventPublisher.publish(new NotificationEventModel(
-                UUID.randomUUID(),
+        var seed = operationId.toString() + ":" + type.name() + ":" + login;
+
+        var eventId = UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
+
+        return List.of(new NotificationEventModel(
+                eventId,
                 operationId,
                 NotificationSourceEnumModel.CASH,
                 type,

@@ -5,7 +5,6 @@
   {{- end -}}
   {{- $serviceEnv := default dict .Values.env -}}
   {{- $env := mergeOverwrite (deepCopy $globalEnv) $serviceEnv -}}
-
 apiVersion: v1
 kind: ConfigMap
 metadata:

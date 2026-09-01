@@ -59,7 +59,12 @@ public class BlockerServiceSecurityConfiguration {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(requests -> requests
-                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/actuator/prometheus"
+                        ).permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/blocker/check").hasRole("SERVICE")
                         .anyRequest().denyAll()
                 )

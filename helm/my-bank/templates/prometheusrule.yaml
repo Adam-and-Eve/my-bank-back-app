@@ -1,0 +1,9 @@
+{{- $rules := .Files.Get "files/prometheus-rules/my-bank-alerts.yaml" | fromYaml -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "my-bank.fullname" . }}-alerts
+  labels:
+    {{- include "my-bank.labels" . | nindent 4 }}
+spec:
+  {{- toYaml $rules | nindent 2 }}

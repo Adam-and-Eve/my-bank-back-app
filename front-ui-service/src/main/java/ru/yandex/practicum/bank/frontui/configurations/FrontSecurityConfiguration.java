@@ -57,7 +57,9 @@ public class FrontSecurityConfiguration {
                                 "/css/**",
                                 "/actuator/health",
                                 "/actuator/health/**",
-                                "/actuator/info").permitAll()
+                                "/actuator/info",
+                                "/actuator/prometheus"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions ->

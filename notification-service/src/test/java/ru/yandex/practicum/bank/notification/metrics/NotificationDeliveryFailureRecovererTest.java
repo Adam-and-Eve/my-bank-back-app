@@ -36,10 +36,10 @@ public class NotificationDeliveryFailureRecovererTest {
 
     // region Constants
 
-    private static final String TOPIC = "bank.notification";
+    private static final String TOPIC = "my.bank.notification";
     private static final int PARTITION = 0;
     private static final long OFFSET = 1L;
-    private static final String METRIC_NAME = "bank.notification.delivery.failures";
+    private static final String METRIC_NAME = "my.bank.notification.delivery.failures";
 
     // endregion
 

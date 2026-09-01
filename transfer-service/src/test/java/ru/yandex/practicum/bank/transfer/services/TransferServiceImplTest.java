@@ -8,9 +8,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import ru.yandex.practicum.bank.shared.interfaces.BlockerClient;
 import ru.yandex.practicum.bank.shared.interfaces.ExchangeClient;
-import ru.yandex.practicum.bank.shared.interfaces.NotificationEventPublisher;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
-import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 import ru.yandex.practicum.bank.shared.models.NotificationTypeEnumModel;
 import ru.yandex.practicum.bank.shared.models.OperationTypeEnumModel;
 import ru.yandex.practicum.bank.shared.viewmodels.ConversionResponseViewModel;
@@ -35,7 +33,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -45,7 +42,7 @@ import static org.mockito.Mockito.when;
  * Модульные тесты для сервиса выполнения переводов TransferServiceImpl.
  * Проверяют валидацию суммы, запрет перевода самому себе,
  * проверку операций через Blocker Service (с предварительной нормализацией в RUB),
- * конвертацию валют, вызов исполнителя и отправку парных уведомлений в Kafka.
+ * конвертацию валют, вызов исполнителя и корректную передачу уведомлений в сервис счетов.
  * </summary>
  **/
 @ExtendWith(MockitoExtension.class)
@@ -69,9 +66,6 @@ public class TransferServiceImplTest {
     @Mock
     private ExchangeClient exchangeClient;
 
-    @Mock
-    private NotificationEventPublisher notificationEventPublisher;
-
     private Clock clock;
 
     private TransferServiceImpl transferService;
@@ -88,7 +82,6 @@ public class TransferServiceImplTest {
                 transferExecutor,
                 blockerClient,
                 exchangeClient,
-                notificationEventPublisher,
                 clock
         );
     }
@@ -101,7 +94,7 @@ public class TransferServiceImplTest {
      * <summary>
      * Проверяет успешный перевод в национальной валюте (RUB).
      * Валидирует обращение к Blocker Service, выполнение через TransferExecutor,
-     * и отправку двух событий в Kafka (отправителю и получателю).
+     * и корректную передачу двух событий (отправителю и получателю) в маппер.
      * </summary>
      **/
     @Test
@@ -170,17 +163,25 @@ public class TransferServiceImplTest {
 
         assertThat(operation.operationId()).isEqualTo(TEST_OPERATION_ID.toString());
 
+        var notifications = operation.notifications();
+
+        assertThat(notifications).hasSize(2);
+
+        assertThat(notifications.get(0).type()).isEqualTo(NotificationTypeEnumModel.TRANSFER_OUTGOING);
+
+        assertThat(notifications.get(1).type()).isEqualTo(NotificationTypeEnumModel.TRANSFER_INCOMING);
+
         verifyNoInteractions(exchangeClient);
     }
 
     /**
      * <summary>
      * Проверяет, что при несовпадении валют происходит обращение к Exchange Service,
-     * а суммы/валюты корректно проставляются в уведомлениях для отправителя и получателя.
+     * а суммы/валюты корректно проставляются в уведомлениях и передаются исполнителю.
      * </summary>
      **/
     @Test
-    public void shouldConvertCurrencyAndSendAccurateNotifications() {
+    public void shouldConvertCurrencyAndPassAccurateNotifications() {
         var senderLogin = "dmitry";
 
         var recipientLogin = "alexey";
@@ -202,17 +203,20 @@ public class TransferServiceImplTest {
 
         transferService.transfer(senderLogin, request, TEST_OPERATION_ID);
 
-        var notificationCaptor = ArgumentCaptor.forClass(NotificationEventModel.class);
+        var operationCaptor = ArgumentCaptor.forClass(TransferOperationViewModel.class);
 
-        verify(notificationEventPublisher, times(2)).publish(notificationCaptor.capture());
+        verify(transferExecutor).execute(operationCaptor.capture());
 
-        var notifications = notificationCaptor.getAllValues();
+        var notifications = operationCaptor.getValue().notifications();
+
+        assertThat(notifications).hasSize(2);
 
         var outgoing = notifications.get(0);
 
         var incoming = notifications.get(1);
 
         assertThat(outgoing.recipientLogin()).isEqualTo(senderLogin);
+
         assertThat(outgoing.type()).isEqualTo(NotificationTypeEnumModel.TRANSFER_OUTGOING);
 
         assertThat(outgoing.message()).isEqualTo("Перевод пользователю alexey: 100.00 USD");
@@ -249,7 +253,6 @@ public class TransferServiceImplTest {
 
         when(exchangeClient.convert(CurrencyEnumModel.USD, CurrencyEnumModel.RUB, new BigDecimal("10.00")))
                 .thenReturn(normalizedConversion);
-
         when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
 
         when(transferExecutor.execute(any())).thenReturn(new TransferResultViewModel("dmitry", "alexey", new BigDecimal("80.00"), "USD"));
@@ -277,7 +280,7 @@ public class TransferServiceImplTest {
         assertThatThrownBy(() -> transferService.transfer("dmitry", request, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountException.class);
 
-        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient, notificationEventPublisher);
+        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient);
     }
 
     /**
@@ -292,7 +295,7 @@ public class TransferServiceImplTest {
         assertThatThrownBy(() -> transferService.transfer("dmitry", request, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountException.class);
 
-        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient, notificationEventPublisher);
+        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient);
     }
 
     /**
@@ -307,7 +310,7 @@ public class TransferServiceImplTest {
         assertThatThrownBy(() -> transferService.transfer("dmitry", request, TEST_OPERATION_ID))
                 .isInstanceOf(InvalidAmountScaleException.class);
 
-        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient, notificationEventPublisher);
+        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient);
     }
 
     /**
@@ -322,7 +325,7 @@ public class TransferServiceImplTest {
         assertThatThrownBy(() -> transferService.transfer("dmitry", request, TEST_OPERATION_ID))
                 .isInstanceOf(SelfTransferForbiddenException.class);
 
-        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient, notificationEventPublisher);
+        verifyNoInteractions(transferExecutor, blockerClient, exchangeClient);
     }
 
     /**
@@ -342,18 +345,15 @@ public class TransferServiceImplTest {
                 .hasMessage("Подозрительный получатель");
 
         verify(transferExecutor, never()).execute(any());
-
-        verifyNoInteractions(notificationEventPublisher);
     }
 
     /**
      * <summary>
-     * Проверяет, что при сбое в сервисе счетов (исключение в TransferExecutor)
-     * уведомления не публикуются.
+     * Проверяет, что при сбое в сервисе счетов пробрасывается исключение без перехватов.
      * </summary>
      **/
     @Test
-    public void shouldNotNotifyWhenTransferExecutorFails() {
+    public void shouldPropagateExceptionWhenTransferExecutorFails() {
         var request = new TransferRequestViewModel("alexey", new BigDecimal("200.00"), CurrencyEnumModel.RUB);
 
         when(blockerClient.check(any())).thenReturn(new OperationCheckResponseViewModel(true, null));
@@ -363,8 +363,6 @@ public class TransferServiceImplTest {
         assertThatThrownBy(() -> transferService.transfer("dmitry", request, TEST_OPERATION_ID))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessage("Account service unavailable");
-
-        verifyNoInteractions(notificationEventPublisher);
     }
 
     // endregion

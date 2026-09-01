@@ -1,33 +1,39 @@
 package ru.yandex.practicum.bank.account.services;
 
-import jakarta.persistence.OptimisticLockException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.bank.account.exceptions.*;
 import ru.yandex.practicum.bank.account.interfaces.BalanceOperationService;
 import ru.yandex.practicum.bank.account.models.AccountModel;
+import ru.yandex.practicum.bank.account.models.OutboxNotificationModel;
 import ru.yandex.practicum.bank.account.repositories.AccountRepository;
+import ru.yandex.practicum.bank.account.repositories.OutboxNotificationRepository;
 import ru.yandex.practicum.bank.account.viewmodels.BalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.BalanceResponseViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.TransferBalanceRequestViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.TransferBalanceResponseViewModel;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 /**
  * <summary>
  * Реализация сервиса проведения балансовых операций и денежных переводов (BalanceOperationServiceImpl).
- * Обеспечивает выполнение пополнения, снятия и междусчётных переводов с обработкой оптимистичных блокировок.
+ * Обеспечивает выполнение пополнения, снятия и междусчётных переводов с обработкой оптимистичных блокировок
+ * и атомарным сохранением уведомлений через паттерн Transactional Outbox.
  * </summary>
  **/
 @Service
@@ -36,6 +42,9 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
     // region Fields
 
     private final AccountRepository accountRepository;
+    private final OutboxNotificationRepository outboxRepository;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     private static final Logger log = LoggerFactory.getLogger(BalanceOperationServiceImpl.class);
 
@@ -48,9 +57,19 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
      * Инициализирует сервис балансовых операций.
      * </summary>
      * @param accountRepository Репозиторий для работы с банковскими счетами.
+     * @param outboxRepository Репозиторий для сохранения событий уведомлений (Outbox).
+     * @param objectMapper Маппер для сериализации событий в JSON.
+     * @param clock Часы для получения текущего времени.
      **/
-    public BalanceOperationServiceImpl(AccountRepository accountRepository) {
+    public BalanceOperationServiceImpl(
+            AccountRepository accountRepository,
+            OutboxNotificationRepository outboxRepository,
+            ObjectMapper objectMapper,
+            Clock clock) {
         this.accountRepository = accountRepository;
+        this.outboxRepository = outboxRepository;
+        this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     // endregion
@@ -62,7 +81,7 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
      * Выполняет операцию пополнения баланса счета.
      * Открывает новую изолированную транзакцию (REQUIRES_NEW).
      * </summary>
-     * @param request Данные запроса на пополнение (логин, сумма, валюта).
+     * @param request Данные запроса на пополнение (логин, сумма, валюта, уведомления).
      * @return Обновленное состояние баланса счета.
      **/
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -77,7 +96,11 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
 
         account.setBalance(account.getBalance().add(request.amount()));
 
-        return toBalanceResponse(accountRepository.save(account));
+        var savedAccount = accountRepository.save(account);
+
+        saveNotificationsToOutbox(request.notifications(), request.operationId());
+
+        return toBalanceResponse(savedAccount);
     }
 
     /**
@@ -85,7 +108,7 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
      * Выполняет операцию снятия средств с баланса счета.
      * Открывает новую изолированную транзакцию (REQUIRES_NEW) и проверяет наличие достаточных средств.
      * </summary>
-     * @param request Данные запроса на снятие (логин, сумма, валюта).
+     * @param request Данные запроса на снятие (логин, сумма, валюта, уведомления).
      * @return Обновленное состояние баланса счета.
      **/
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -100,7 +123,11 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
 
         withdraw(account, request.amount(), request.operationId(), "WITHDRAW", request.currency().name());
 
-        return toBalanceResponse(accountRepository.save(account));
+        var savedAccount = accountRepository.save(account);
+
+        saveNotificationsToOutbox(request.notifications(), request.operationId());
+
+        return toBalanceResponse(savedAccount);
     }
 
     /**
@@ -109,7 +136,7 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
      * Открывает новую транзакцию (REQUIRES_NEW). Проверяет валидность сумм, совпадение валют
      * и предотвращает потенциальные взаимные блокировки базы данных (Deadlocks) за счет детерминированного сохранения.
      * </summary>
-     * @param request Данные перевода (отправитель, получатель, суммы отправки и зачисления, валюты).
+     * @param request Данные перевода (отправитель, получатель, суммы отправки и зачисления, валюты, уведомления).
      * @return Детали выполненного перевода (баланс отправителя).
      * @throws SelfTransferForbiddenException Если логин отправителя совпадает с получателем.
      * @throws RecipientNotFoundException Если счет получателя не найден в базе.
@@ -151,6 +178,8 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
         recipient.setBalance(recipient.getBalance().add(request.resolvedRecipientAmount()));
 
         saveInDeterministicOrder(sender, recipient);
+
+        saveNotificationsToOutbox(request.notifications(), request.operationId());
 
         return new TransferBalanceResponseViewModel(
                 sender.getLogin(),
@@ -287,6 +316,42 @@ public class BalanceOperationServiceImpl implements BalanceOperationService {
                 account.getBalance(),
                 account.getCurrency().name()
         );
+    }
+
+    /**
+     * <summary>
+     * Сериализует и атомарно сохраняет модели уведомлений в таблицу Outbox.
+     * В случае ошибки сериализации выбрасывает RuntimeException для отката транзакции.
+     * </summary>
+     * @param notifications Список событий уведомлений, которые нужно отправить.
+     * @param operationId Уникальный идентификатор операции.
+     **/
+    private void saveNotificationsToOutbox(List<NotificationEventModel> notifications, String operationId) {
+        if (notifications == null || notifications.isEmpty()) {
+            return;
+        }
+
+        var now = LocalDateTime.now(clock);
+
+        var outboxEntities = notifications.stream()
+                .map(event -> {
+                    try {
+                        return new OutboxNotificationModel(
+                                UUID.randomUUID(),
+                                event.eventId(),
+                                operationId,
+                                objectMapper.writeValueAsString(event),
+                                now
+                        );
+                    } catch (JsonProcessingException exception) {
+                        log.error("Failed to serialize notification eventId={}", event.eventId(), exception);
+
+                        throw new RuntimeException("Outbox serialization failed", exception);
+                    }
+                })
+                .toList();
+
+        outboxRepository.saveAll(outboxEntities);
     }
 
     // endregion

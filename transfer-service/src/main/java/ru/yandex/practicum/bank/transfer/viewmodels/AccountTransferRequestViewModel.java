@@ -1,8 +1,10 @@
 package ru.yandex.practicum.bank.transfer.viewmodels;
 
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
+import ru.yandex.practicum.bank.shared.models.NotificationEventModel;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * <summary>
@@ -21,6 +23,7 @@ public record AccountTransferRequestViewModel(
         CurrencyEnumModel currency,
         BigDecimal recipientAmount,
         CurrencyEnumModel recipientCurrency,
-        String operationId
+        String operationId,
+        List<NotificationEventModel> notifications
 ) {
 }

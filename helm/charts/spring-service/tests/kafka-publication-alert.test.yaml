@@ -1,0 +1,20 @@
+rule_files:
+  - kafka-publication-alert.rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'my_bank_kafka_publication_failures_total{application="account-service"}'
+        values: '0 1 1 1'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: KafkaNotificationPublicationFailures
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              application: account-service
+            exp_annotations:
+              summary: "Kafka notification publication failures in account-service"
+              description: "The account-service has experienced Kafka publication failures in the last 15 minutes."

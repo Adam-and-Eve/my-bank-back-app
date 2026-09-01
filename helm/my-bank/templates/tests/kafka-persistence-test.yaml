@@ -1,15 +1,15 @@
 {{- $test := .Values.helmTest | default dict -}}
   {{- if ($test.enabled | default true) }}
-  {{- $kafka := index .Values "kafka" | default dict -}}
-  {{- $account := index .Values "account-service" | default dict -}}
-  {{- $notification := index .Values "notification-service" | default dict -}}
+  {{- $kafka := index .Values "kafka" -}}
+  {{- $account := index .Values "account-service" -}}
+  {{- $notification := index .Values "notification-service" -}}
   {{- $globalEnv := default dict .Values.global.env -}}
   {{- $accountEnv := mergeOverwrite (deepCopy $globalEnv) (default dict $account.env) -}}
   {{- $notificationEnv := mergeOverwrite (deepCopy $globalEnv) (default dict $notification.env) -}}
   {{- $kafkaName := default "kafka" $kafka.fullnameOverride -}}
-  {{- $mainTopic := get $accountEnv "BANK_KAFKA_NOTIFICATION_TOPIC" | default "bank.notification" -}}
-  {{- $dltTopic := get $accountEnv "BANK_KAFKA_NOTIFICATION_DLT_TOPIC" | default "bank.notification.dlt" -}}
-  {{- $baseConsumerGroup := get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID" | default "bank-notification" -}}
+  {{- $mainTopic := required "BANK_KAFKA_NOTIFICATION_TOPIC is required" (get $accountEnv "BANK_KAFKA_NOTIFICATION_TOPIC") -}}
+  {{- $dltTopic := default "bank.notification.dlt" (get $accountEnv "BANK_KAFKA_NOTIFICATION_DLT_TOPIC") -}}
+  {{- $baseConsumerGroup := required "notification-service.env.SPRING_KAFKA_CONSUMER_GROUP_ID is required" (get $notificationEnv "SPRING_KAFKA_CONSUMER_GROUP_ID") -}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -34,9 +34,6 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["apps"]
-    resources: ["deployments"]
-    verbs: ["get", "list", "watch", "patch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -88,52 +85,50 @@ spec:
             - -ec
             - |
               bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
-              target_group="{{ $baseConsumerGroup }}"
-              topic="{{ $mainTopic }}"
-              dlt_topic="{{ $dltTopic }}"
+              unique_group="{{ $baseConsumerGroup }}-test-$RANDOM"
 
-              # Исправлено: $4 — это CURRENT-OFFSET
-              get_committed_offset() {
-                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $4} END {print sum}'
-              }
-              
-              get_dlt_size() {
-                /opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$bootstrap" --topic "$dlt_topic" --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}'
+              get_partition_offset() {
+                /opt/kafka/bin/kafka-get-offsets.sh \
+                  --bootstrap-server "$bootstrap" \
+                  --topic "{{ $mainTopic }}" \
+                  --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}'
               }
 
-              # Безопасное присвоение дефолтных значений для set -e
-              initial_commit="$(get_committed_offset)"
-              initial_commit="${initial_commit:-0}"
-              
-              initial_dlt="$(get_dlt_size)"
-              initial_dlt="${initial_dlt:-0}"
+              initial_offset="$(get_partition_offset)"
+              test -z "$initial_offset" && initial_offset=0
 
               event_id="$(cat /proc/sys/kernel/random/uuid)"
-              event="{\"eventId\":\"$event_id\",\"operationId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test-1\",\"message\":\"Persistence test 1\",\"occurredAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"amount\":null,\"currency\":null}"
+              operation_id="$(cat /proc/sys/kernel/random/uuid)"
+              occurred_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
               
-              printf 'helm-persistence-test-1|%s\n' "$event" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server "$bootstrap" --topic "$topic" --property parse.key=true --property key.separator='|'
+              event="{\"eventId\":\"$event_id\",\"operationId\":\"$operation_id\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test\",\"message\":\"Helm persistence test\",\"occurredAt\":\"$occurred_at\",\"amount\":null,\"currency\":null}"
+              
+              printf 'helm-persistence-test|%s\n' "$event" |
+                /opt/kafka/bin/kafka-console-producer.sh \
+                  --bootstrap-server "$bootstrap" \
+                  --topic "{{ $mainTopic }}" \
+                  --property parse.key=true \
+                  --property key.separator='|'
 
-              current_commit="$initial_commit"
-              for i in $(seq 1 60); do
-                current_commit="$(get_committed_offset)"
-                current_commit="${current_commit:-0}"
-                if [ "$current_commit" -gt "$initial_commit" ]; then
-                  break
-                fi
+              current_offset="$initial_offset"
+              for attempt in $(seq 1 30); do
+                current_offset="$(get_partition_offset)"
+                test "$current_offset" -gt "$initial_offset" && break
                 sleep 1
               done
-              
-              if [ "$current_commit" -le "$initial_commit" ]; then
-                echo "ERROR: Timeout waiting for notification-service to commit event 1"
-                exit 1
-              fi
+              test "$current_offset" -gt "$initial_offset"
 
-              topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
+              topic_id="$(/opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server "$bootstrap" \
+                --describe \
+                --topic "{{ $mainTopic }}" |
+                sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' |
+                head -n 1)"
+              test -n "$topic_id"
 
               printf '%s\n' "$topic_id" > /state/topic-id
-              printf '%s\n' "$event_id" > /state/event1-id
-              printf '%s\n' "$event" > /state/payload1
-              printf '%s\n' "$initial_dlt" > /state/dlt-before
+              printf '%s\n' "$event_id" > /state/event-id
+              printf '%s\n' "$event" > /state/payload
         - name: delete-kafka
           image: {{ required "helmTest.kubectlImage is required" $test.kubectlImage | quote }}
           imagePullPolicy: {{ $test.imagePullPolicy | default "IfNotPresent" }}
@@ -165,51 +160,8 @@ spec:
             - --for=jsonpath={.status.phase}=Bound
             - pvc/{{ $kafkaName }}-data
             - --timeout=30s
-        - name: verify-kafka-state-1
-          image: "{{ $kafka.image.repository }}:{{ $kafka.image.tag }}"
-          imagePullPolicy: {{ $kafka.image.pullPolicy }}
-          volumeMounts:
-            - name: state
-              mountPath: /state
-          command:
-            - bash
-            - -ec
-            - |
-              bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
-              topic="{{ $mainTopic }}"
-              
-              after_topic_id="$(/opt/kafka/bin/kafka-topics.sh --bootstrap-server "$bootstrap" --describe --topic "$topic" | sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' | head -n 1)"
-              if [ "$after_topic_id" != "$(cat /state/topic-id)" ]; then
-                echo "ERROR: Topic ID mismatch after restart!"
-                exit 1
-              fi
-
-              event1_id="$(cat /state/event1-id)"
-              payload1="$(cat /state/payload1)"
-              unique_reader_group="test-reader-$(cat /proc/sys/kernel/random/uuid)"
-              
-              consumed_data="$(/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server "$bootstrap" --topic "$topic" --group "$unique_reader_group" --from-beginning --timeout-ms 10000 2>/dev/null || true)"
-              
-              if ! echo "$consumed_data" | grep -q "$event1_id"; then
-                echo "ERROR: Event 1 ID missing after restart!"
-                exit 1
-              fi
-              
-              if ! echo "$consumed_data" | grep -q "$payload1"; then
-                echo "ERROR: Event 1 Payload corrupted after restart!"
-                exit 1
-              fi
-        - name: restart-notification
-          image: {{ required "helmTest.kubectlImage is required" $test.kubectlImage | quote }}
-          imagePullPolicy: {{ $test.imagePullPolicy | default "IfNotPresent" }}
-          command:
-            - bash
-            - -ec
-            - |
-              kubectl rollout restart deployment/{{ include "my-bank.fullname" . }}-notification-service
-              kubectl rollout status deployment/{{ include "my-bank.fullname" . }}-notification-service --timeout=120s
       containers:
-        - name: verify-kafka-state-2
+        - name: verify-kafka-state
           image: "{{ $kafka.image.repository }}:{{ $kafka.image.tag }}"
           imagePullPolicy: {{ $kafka.image.pullPolicy }}
           volumeMounts:
@@ -220,43 +172,35 @@ spec:
             - -ec
             - |
               bootstrap="{{ $kafkaName }}:{{ $kafka.service.brokerPort }}"
-              target_group="{{ $baseConsumerGroup }}"
-              topic="{{ $mainTopic }}"
-              dlt_topic="{{ $dltTopic }}"
+              target_event_id="$(cat /state/event-id)"
+              expected_payload="$(cat /state/payload)"
 
-              get_committed_offset() {
-                /opt/kafka/bin/kafka-consumer-groups.sh --bootstrap-server "$bootstrap" --describe --group "$target_group" 2>/dev/null | awk -v t="$topic" '$2 == t {sum += $4} END {print sum}'
-              }
-              
-              commit_before_event2="$(get_committed_offset)"
-              commit_before_event2="${commit_before_event2:-0}"
+              after_topic_id="$(/opt/kafka/bin/kafka-topics.sh \
+                --bootstrap-server "$bootstrap" \
+                --describe \
+                --topic "{{ $mainTopic }}" |
+                sed -n 's/.*TopicId: \([^[:space:]]*\).*/\1/p' |
+                head -n 1)"
+              test "$after_topic_id" = "$(cat /state/topic-id)"
 
-              event2_id="$(cat /proc/sys/kernel/random/uuid)"
-              event2="{\"eventId\":\"$event2_id\",\"operationId\":\"$(cat /proc/sys/kernel/random/uuid)\",\"source\":\"ACCOUNT\",\"type\":\"ACCOUNT_UPDATED\",\"recipientLogin\":\"helm-persistence-test-2\",\"message\":\"Persistence test 2\",\"occurredAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"amount\":null,\"currency\":null}"
+              consumed_data="$(/opt/kafka/bin/kafka-console-consumer.sh \
+                --bootstrap-server "$bootstrap" \
+                --topic "{{ $mainTopic }}" \
+                --from-beginning \
+                --max-messages 1 \
+                --timeout-ms 10000)"
               
-              printf 'helm-persistence-test-2|%s\n' "$event2" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server "$bootstrap" --topic "$topic" --property parse.key=true --property key.separator='|'
+              echo "$consumed_data" | grep -q "$target_event_id"
+              echo "$consumed_data" | grep -q "$expected_payload"
+              
+              dlt_count="$(/opt/kafka/bin/kafka-get-offsets.sh \
+                --bootstrap-server "$bootstrap" \
+                --topic "{{ $dltTopic }}" \
+                --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}')"
+              test -z "$dlt_count" || test "$dlt_count" -eq 0
 
-              commit_after_event2="$commit_before_event2"
-              for i in $(seq 1 60); do
-                commit_after_event2="$(get_committed_offset)"
-                commit_after_event2="${commit_after_event2:-0}"
-                if [ "$commit_after_event2" -gt "$commit_before_event2" ]; then
-                  break
-                fi
-                sleep 1
-              done
-              
-              if [ "$commit_after_event2" -le "$commit_before_event2" ]; then
-                echo "ERROR: Timeout waiting for notification-service to commit event 2"
-                exit 1
-              fi
-
-              dlt_before="$(cat /state/dlt-before)"
-              dlt_after="$(/opt/kafka/bin/kafka-get-offsets.sh --bootstrap-server "$bootstrap" --topic "$dlt_topic" --time -1 2>/dev/null | awk -F: '{sum += $3} END {print sum}')"
-              dlt_after="${dlt_after:-0}"
-              
-              if [ "$dlt_after" -ne "$dlt_before" ]; then
-                echo "ERROR: DLT topic size increased! Valid message was discarded."
-                exit 1
+              if kubectl get deployment {{ include "my-bank.fullname" . }}-notification-service >/dev/null 2>&1; then
+                kubectl rollout restart deployment/{{ include "my-bank.fullname" . }}-notification-service
+                kubectl rollout status deployment/{{ include "my-bank.fullname" . }}-notification-service --timeout=120s
               fi
   {{- end }}

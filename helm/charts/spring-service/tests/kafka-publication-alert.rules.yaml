@@ -1,0 +1,11 @@
+groups:
+  - name: account-service.kafka
+    rules:
+      - alert: KafkaNotificationPublicationFailures
+        expr: sum by (application) (increase(my_bank_kafka_publication_failures_total{application="account-service"}[15m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Kafka notification publication failures in account-service"
+          description: "The account-service has experienced Kafka publication failures in the last 15 minutes."

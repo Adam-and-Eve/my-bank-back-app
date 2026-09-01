@@ -9,9 +9,17 @@ exchange-generator-service:
   service:
     port: 8087
 
+  management:
+    enabled: true
+    port: 8097
+
+  probes:
+    port: management
+
   env:
     BANK_SERVICES_EXCHANGE_SERVICE_BASE_URL: http://exchange-service:8086
     BANK_SERVICES_EXCHANGE_GENERATOR_SERVICES_FIXED_DELAY_MS: "1000"
+    MANAGEMENT_SERVER_PORT: "8097"
     SERVER_PORT: "8087"
 
   secretEnv:

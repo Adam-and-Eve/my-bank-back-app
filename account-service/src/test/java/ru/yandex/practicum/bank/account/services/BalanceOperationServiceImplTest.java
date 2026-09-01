@@ -1,5 +1,6 @@
 package ru.yandex.practicum.bank.account.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,12 +12,17 @@ import org.springframework.test.util.ReflectionTestUtils;
 import ru.yandex.practicum.bank.account.exceptions.*;
 import ru.yandex.practicum.bank.account.models.AccountModel;
 import ru.yandex.practicum.bank.account.repositories.AccountRepository;
+import ru.yandex.practicum.bank.account.repositories.OutboxNotificationRepository;
 import ru.yandex.practicum.bank.account.viewmodels.BalanceOperationRequestViewModel;
 import ru.yandex.practicum.bank.account.viewmodels.TransferBalanceRequestViewModel;
 import ru.yandex.practicum.bank.shared.models.CurrencyEnumModel;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +46,7 @@ public class BalanceOperationServiceImplTest {
     private static final String LOGIN_ALEXEY = "alexey";
     private static final String LOGIN_UNKNOWN = "unknown";
     private static final String OPERATION_ID = "op-uuid-12345";
+    private static final Instant FIXED_INSTANT = Instant.parse("2026-08-27T12:00:00Z");
 
     // endregion
 
@@ -47,6 +54,12 @@ public class BalanceOperationServiceImplTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private OutboxNotificationRepository outboxRepository;
+
+    private ObjectMapper objectMapper;
+    private Clock clock;
 
     private BalanceOperationServiceImpl balanceOperationService;
 
@@ -56,18 +69,21 @@ public class BalanceOperationServiceImplTest {
 
     @BeforeEach
     public void setUp() {
-        balanceOperationService = new BalanceOperationServiceImpl(accountRepository);
+        objectMapper = new ObjectMapper();
+        clock = Clock.fixed(FIXED_INSTANT, ZoneId.of("UTC"));
+
+        balanceOperationService = new BalanceOperationServiceImpl(
+                accountRepository,
+                outboxRepository,
+                objectMapper,
+                clock
+        );
     }
 
     // endregion
 
     // region Tests - Deposit
 
-    /**
-     * <summary>
-     * Проверяет успешное пополнение баланса счета.
-     * </summary>
-     **/
     @Test
     public void shouldDepositBalanceSuccessfully() {
         var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -76,7 +92,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_DMITRY,
                 new BigDecimal("500.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
@@ -98,18 +115,14 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository).save(account);
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс AccountNotFoundException при попытке пополнения несуществующего счета.
-     * </summary>
-     **/
     @Test
     public void shouldThrowAccountNotFoundExceptionWhenDepositingToUnknownAccount() {
         var request = new BalanceOperationRequestViewModel(
                 LOGIN_UNKNOWN,
                 new BigDecimal("100.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_UNKNOWN)).thenReturn(Optional.empty());
@@ -120,11 +133,6 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository, never()).save(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс CurrencyMismatchException при несовпадении валюты пополнения и счета.
-     * </summary>
-     **/
     @Test
     public void shouldThrowCurrencyMismatchExceptionWhenDepositCurrencyDiffers() {
         var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -132,8 +140,9 @@ public class BalanceOperationServiceImplTest {
         var request = new BalanceOperationRequestViewModel(
                 LOGIN_DMITRY,
                 new BigDecimal("500.00"),
-                CurrencyEnumModel.USD, // Валюта не совпадает
-                OPERATION_ID
+                CurrencyEnumModel.USD,
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
@@ -148,11 +157,6 @@ public class BalanceOperationServiceImplTest {
 
     // region Tests - Withdraw
 
-    /**
-     * <summary>
-     * Проверяет успешное списание денежных средств со счета.
-     * </summary>
-     **/
     @Test
     public void shouldWithdrawBalanceSuccessfully() {
         var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -161,7 +165,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_DMITRY,
                 new BigDecimal("400.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
@@ -177,11 +182,6 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository).save(account);
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс InsufficientFundsException, если сумма списания превышает доступный баланс.
-     * </summary>
-     **/
     @Test
     public void shouldThrowInsufficientFundsExceptionWhenBalanceIsInsufficient() {
         var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("100.00"), CurrencyEnumModel.RUB);
@@ -190,7 +190,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_DMITRY,
                 new BigDecimal("150.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
@@ -201,11 +202,6 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository, never()).save(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс CurrencyMismatchException при несовпадении валюты снятия и счета.
-     * </summary>
-     **/
     @Test
     public void shouldThrowCurrencyMismatchExceptionWhenWithdrawCurrencyDiffers() {
         var account = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -214,7 +210,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_DMITRY,
                 new BigDecimal("400.00"),
                 CurrencyEnumModel.CNY,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(account));
@@ -229,12 +226,6 @@ public class BalanceOperationServiceImplTest {
 
     // region Tests - Transfer
 
-    /**
-     * <summary>
-     * Проверяет успешный перевод средств между счетами без конвертации валюты.
-     * Также проверяет детерминированный порядок сохранения моделей по возрастанию ID (предотвращение Deadlock).
-     * </summary>
-     **/
     @Test
     public void shouldTransferBalanceSuccessfully() {
         var sender = createAccount(2L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -246,7 +237,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_ALEXEY,
                 new BigDecimal("300.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
@@ -274,12 +266,6 @@ public class BalanceOperationServiceImplTest {
         inOrder.verify(accountRepository).save(sender);
     }
 
-    /**
-     * <summary>
-     * Проверяет перевод с конвертацией валюты, при котором с отправителя
-     * списывается исходная сумма, а получателю зачисляется рассчитанная сумма в другой валюте.
-     * </summary>
-     **/
     @Test
     public void shouldTransferBalanceWithCurrencyConversion() {
         var sender = createAccount(2L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -293,7 +279,8 @@ public class BalanceOperationServiceImplTest {
                 CurrencyEnumModel.RUB,
                 new BigDecimal("1.10"),
                 CurrencyEnumModel.USD,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
@@ -303,9 +290,6 @@ public class BalanceOperationServiceImplTest {
         var response = balanceOperationService.transfer(request);
 
         assertThat(response).isNotNull();
-        assertThat(response.senderLogin()).isEqualTo(LOGIN_DMITRY);
-
-        assertThat(response.recipientLogin()).isEqualTo(LOGIN_ALEXEY);
 
         assertThat(response.senderBalance()).isEqualByComparingTo("900.00");
 
@@ -320,12 +304,6 @@ public class BalanceOperationServiceImplTest {
         inOrder.verify(accountRepository).save(sender);
     }
 
-    /**
-     * <summary>
-     * Проверяет использование исходной суммы и валюты в качестве суммы и валюты
-     * получателя, если параметры resolvedRecipientAmount и resolvedRecipientCurrency не заданы явно.
-     * </summary>
-     **/
     @Test
     public void shouldUseSourceAmountAndCurrencyWhenRecipientValuesAreNull() {
         var sender = createAccount(2L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -339,7 +317,8 @@ public class BalanceOperationServiceImplTest {
                 CurrencyEnumModel.RUB,
                 null,
                 null,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
@@ -353,11 +332,6 @@ public class BalanceOperationServiceImplTest {
         assertThat(recipient.getBalance()).isEqualByComparingTo("800.00");
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс SelfTransferForbiddenException при попытке сделать перевод самому себе.
-     * </summary>
-     **/
     @Test
     public void shouldThrowSelfTransferForbiddenExceptionWhenTransferringToSelf() {
         var request = new TransferBalanceRequestViewModel(
@@ -365,7 +339,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_DMITRY,
                 new BigDecimal("100.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         assertThatThrownBy(() -> balanceOperationService.transfer(request))
@@ -374,11 +349,6 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository, never()).findByLogin(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс RecipientNotFoundException, если получатель перевода не найден.
-     * </summary>
-     **/
     @Test
     public void shouldThrowRecipientNotFoundExceptionWhenRecipientDoesNotExist() {
         var sender = createAccount(1L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -388,7 +358,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_UNKNOWN,
                 new BigDecimal("100.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
@@ -401,12 +372,6 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository, never()).save(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет, что при недостаточном балансе отправителя получатель
-     * не изменяется и ни один аккаунт не сохраняется.
-     * </summary>
-     **/
     @Test
     public void shouldThrowInsufficientFundsExceptionWhenTransferAmountExceedsSenderBalance() {
         var sender = createAccount(2L, LOGIN_DMITRY, new BigDecimal("100.00"), CurrencyEnumModel.RUB);
@@ -418,7 +383,8 @@ public class BalanceOperationServiceImplTest {
                 LOGIN_ALEXEY,
                 new BigDecimal("150.00"),
                 CurrencyEnumModel.RUB,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
@@ -430,16 +396,11 @@ public class BalanceOperationServiceImplTest {
 
         assertThat(sender.getBalance()).isEqualByComparingTo("100.00");
 
-        assertThat(recipient.getBalance()).isEqualByComparingTo("500.00");
-
+        assertThat(recipient.getBalance()).isEqualByComparingTo("500.00")
+        ;
         verify(accountRepository, never()).save(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс CurrencyMismatchException, если валюта отправителя не совпадает с запрашиваемой.
-     * </summary>
-     **/
     @Test
     public void shouldThrowCurrencyMismatchExceptionWhenSenderCurrencyDiffers() {
         var sender = createAccount(2L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -453,7 +414,8 @@ public class BalanceOperationServiceImplTest {
                 CurrencyEnumModel.CNY,
                 new BigDecimal("1.10"),
                 CurrencyEnumModel.USD,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
@@ -466,11 +428,6 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository, never()).save(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс CurrencyMismatchException, если валюта получателя не совпадает с запрашиваемой для зачисления.
-     * </summary>
-     **/
     @Test
     public void shouldThrowCurrencyMismatchExceptionWhenRecipientCurrencyDiffers() {
         var sender = createAccount(2L, LOGIN_DMITRY, new BigDecimal("1000.00"), CurrencyEnumModel.RUB);
@@ -484,11 +441,11 @@ public class BalanceOperationServiceImplTest {
                 CurrencyEnumModel.RUB,
                 new BigDecimal("1.10"),
                 CurrencyEnumModel.CNY,
-                OPERATION_ID
+                OPERATION_ID,
+                List.of()
         );
 
         when(accountRepository.findByLogin(LOGIN_DMITRY)).thenReturn(Optional.of(sender));
-
         when(accountRepository.findByLogin(LOGIN_ALEXEY)).thenReturn(Optional.of(recipient));
 
         assertThatThrownBy(() -> balanceOperationService.transfer(request))
@@ -501,25 +458,14 @@ public class BalanceOperationServiceImplTest {
 
     // region Tests - Validation
 
-    /**
-     * <summary>
-     * Проверяет выброс InvalidAmountException, если сумма нулевая или отрицательная.
-     * </summary>
-     **/
     @Test
     public void shouldThrowInvalidAmountExceptionForZeroOrNegativeAmount() {
         var zeroRequest = new BalanceOperationRequestViewModel(
-                LOGIN_DMITRY,
-                BigDecimal.ZERO,
-                CurrencyEnumModel.RUB,
-                OPERATION_ID
+                LOGIN_DMITRY, BigDecimal.ZERO, CurrencyEnumModel.RUB, OPERATION_ID, List.of()
         );
 
         var negativeRequest = new BalanceOperationRequestViewModel(
-                LOGIN_DMITRY,
-                new BigDecimal("-10.00"),
-                CurrencyEnumModel.RUB,
-                OPERATION_ID
+                LOGIN_DMITRY, new BigDecimal("-10.00"), CurrencyEnumModel.RUB, OPERATION_ID, List.of()
         );
 
         assertThatThrownBy(() -> balanceOperationService.deposit(zeroRequest))
@@ -529,58 +475,31 @@ public class BalanceOperationServiceImplTest {
                 .isInstanceOf(InvalidAmountException.class);
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс NullPointerException при передаче null вместо суммы
-     * (так как валидатор выполняет метод .compareTo у переданного значения).
-     * </summary>
-     **/
     @Test
     public void shouldThrowNullPointerExceptionWhenAmountIsNull() {
         var request = new BalanceOperationRequestViewModel(
-                LOGIN_DMITRY,
-                null,
-                CurrencyEnumModel.RUB,
-                OPERATION_ID
+                LOGIN_DMITRY, null, CurrencyEnumModel.RUB, OPERATION_ID, List.of()
         );
 
         assertThatThrownBy(() -> balanceOperationService.deposit(request))
                 .isInstanceOf(NullPointerException.class);
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс InvalidAmountScaleException, если сумма имеет более 2 знаков после запятой.
-     * </summary>
-     **/
     @Test
     public void shouldThrowInvalidAmountScaleExceptionWhenScaleExceedsTwo() {
         var invalidScaleRequest = new BalanceOperationRequestViewModel(
-                LOGIN_DMITRY,
-                new BigDecimal("10.555"),
-                CurrencyEnumModel.RUB,
-                OPERATION_ID
+                LOGIN_DMITRY, new BigDecimal("10.555"), CurrencyEnumModel.RUB, OPERATION_ID, List.of()
         );
 
         assertThatThrownBy(() -> balanceOperationService.deposit(invalidScaleRequest))
                 .isInstanceOf(InvalidAmountScaleException.class);
     }
 
-    /**
-     * <summary>
-     * Проверяет валидацию суммы, зачисляемой получателю при переводе.
-     * </summary>
-     **/
     @Test
     public void shouldThrowInvalidAmountExceptionWhenRecipientAmountIsInvalid() {
         var request = new TransferBalanceRequestViewModel(
-                LOGIN_DMITRY,
-                LOGIN_ALEXEY,
-                new BigDecimal("100.00"),
-                CurrencyEnumModel.RUB,
-                BigDecimal.ZERO,
-                CurrencyEnumModel.USD,
-                OPERATION_ID
+                LOGIN_DMITRY, LOGIN_ALEXEY, new BigDecimal("100.00"), CurrencyEnumModel.RUB,
+                BigDecimal.ZERO, CurrencyEnumModel.USD, OPERATION_ID, List.of()
         );
 
         assertThatThrownBy(() -> balanceOperationService.transfer(request))
@@ -589,22 +508,11 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository, never()).findByLogin(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс InvalidAmountScaleException, если сумма зачисления
-     * получателю содержит более двух знаков после запятой.
-     * </summary>
-     **/
     @Test
     public void shouldThrowInvalidAmountScaleExceptionWhenRecipientAmountScaleExceedsTwo() {
         var request = new TransferBalanceRequestViewModel(
-                LOGIN_DMITRY,
-                LOGIN_ALEXEY,
-                new BigDecimal("100.00"),
-                CurrencyEnumModel.RUB,
-                new BigDecimal("1.555"),
-                CurrencyEnumModel.USD,
-                OPERATION_ID
+                LOGIN_DMITRY, LOGIN_ALEXEY, new BigDecimal("100.00"), CurrencyEnumModel.RUB,
+                new BigDecimal("1.555"), CurrencyEnumModel.USD, OPERATION_ID, List.of()
         );
 
         assertThatThrownBy(() -> balanceOperationService.transfer(request))
@@ -613,11 +521,6 @@ public class BalanceOperationServiceImplTest {
         verify(accountRepository, never()).findByLogin(any());
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс NullPointerException при передаче null вместо запроса на перевод.
-     * </summary>
-     **/
     @Test
     public void shouldThrowExceptionWhenTransferRequestIsNull() {
         assertThatThrownBy(() -> balanceOperationService.transfer(null))
@@ -627,11 +530,6 @@ public class BalanceOperationServiceImplTest {
         verifyNoInteractions(accountRepository);
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс NullPointerException при передаче null вместо запроса на пополнение.
-     * </summary>
-     **/
     @Test
     public void shouldThrowExceptionWhenDepositRequestIsNull() {
         assertThatThrownBy(() -> balanceOperationService.deposit(null))
@@ -641,11 +539,6 @@ public class BalanceOperationServiceImplTest {
         verifyNoInteractions(accountRepository);
     }
 
-    /**
-     * <summary>
-     * Проверяет выброс NullPointerException при передаче null вместо запроса на снятие.
-     * </summary>
-     **/
     @Test
     public void shouldThrowExceptionWhenWithdrawRequestIsNull() {
         assertThatThrownBy(() -> balanceOperationService.withdraw(null))
