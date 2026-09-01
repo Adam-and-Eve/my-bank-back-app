@@ -17,6 +17,7 @@ import ru.yandex.practicum.bank.shared.models.*;
 import ru.yandex.practicum.bank.shared.viewmodels.OperationCheckRequestViewModel;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -263,12 +264,16 @@ public class CashServiceImpl implements CashService {
             UUID operationId,
             NotificationTypeEnumModel type
     ) {
-        String message = type == NotificationTypeEnumModel.CASH_DEPOSITED
+        var message = type == NotificationTypeEnumModel.CASH_DEPOSITED
                 ? "Счёт пополнен на " + request.amount() + " " + request.currency()
                 : "Со счёта снято " + request.amount() + " " + request.currency();
 
+        var seed = operationId.toString() + ":" + type.name() + ":" + login;
+
+        var eventId = UUID.nameUUIDFromBytes(seed.getBytes(StandardCharsets.UTF_8));
+
         return List.of(new NotificationEventModel(
-                UUID.randomUUID(),
+                eventId,
                 operationId,
                 NotificationSourceEnumModel.CASH,
                 type,

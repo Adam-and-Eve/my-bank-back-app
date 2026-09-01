@@ -14,6 +14,7 @@ import ru.yandex.practicum.bank.transfer.interfaces.TransferService;
 import ru.yandex.practicum.bank.transfer.viewmodels.*;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -262,9 +263,17 @@ public class TransferServiceImpl implements TransferService {
     ) {
         var occurredAt = Instant.now(clock);
 
+        var senderSeed = operationId.toString() + ":" + NotificationTypeEnumModel.TRANSFER_OUTGOING.name() + ":" + senderLogin;
+
+        var senderEventId = UUID.nameUUIDFromBytes(senderSeed.getBytes(StandardCharsets.UTF_8));
+
+        var recipientSeed = operationId.toString() + ":" + NotificationTypeEnumModel.TRANSFER_INCOMING.name() + ":" + request.recipientLogin();
+
+        var recipientEventId = UUID.nameUUIDFromBytes(recipientSeed.getBytes(StandardCharsets.UTF_8));
+
         return List.of(
                 new NotificationEventModel(
-                        UUID.randomUUID(),
+                        senderEventId,
                         operationId,
                         NotificationSourceEnumModel.TRANSFER,
                         NotificationTypeEnumModel.TRANSFER_OUTGOING,
@@ -276,7 +285,7 @@ public class TransferServiceImpl implements TransferService {
                         conversion.sourceCurrency()
                 ),
                 new NotificationEventModel(
-                        UUID.randomUUID(),
+                        recipientEventId,
                         operationId,
                         NotificationSourceEnumModel.TRANSFER,
                         NotificationTypeEnumModel.TRANSFER_INCOMING,
